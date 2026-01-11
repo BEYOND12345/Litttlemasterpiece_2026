@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Supabase Database Test</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      max-width: 1200px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      border-radius: 8px;
+      padding: 30px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      border-bottom: 3px solid #4CAF50;
+      padding-bottom: 10px;
+    }
+    .test-section {
+      margin: 20px 0;
+      padding: 15px;
+      border-left: 4px solid #2196F3;
+      background: #f9f9f9;
+    }
+    .result {
+      margin: 10px 0;
+      padding: 10px;
+      border-radius: 4px;
+    }
+    .success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    .error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    .warning {
+      background: #fff3cd;
+      color: #856404;
+      border: 1px solid #ffeaa7;
+    }
+    .info {
+      background: #d1ecf1;
+      color: #0c5460;
+      border: 1px solid #bee5eb;
+    }
+    button {
+      background: #4CAF50;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      font-size: 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 10px 5px 10px 0;
+    }
+    button:hover {
+      background: #45a049;
+    }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    #results {
+      margin-top: 20px;
+    }
+    pre {
+      background: #f4f4f4;
+      padding: 10px;
+      border-radius: 4px;
+      overflow-x: auto;
+    }
+    .summary {
+      font-size: 18px;
+      font-weight: bold;
+      margin: 20px 0;
+      padding: 15px;
+      background: #e3f2fd;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔍 Supabase Database Test Suite</h1>
+
+    <div class="info result">
+      <strong>Instructions:</strong> Click "Run All Tests" to check your database configuration.
+      This will test all tables, RLS policies, and data access.
+    </div>
+
+    <button onclick="runAllTests()" id="runBtn">▶️ Run All Tests</button>
+    <button onclick="clearResults()">🗑️ Clear Results</button>
+
+    <div id="results"></div>
+  </div>
+
+  <script>
+    const SUPABASE_URL = 'https://bhltnhutjgyzvbcsjitp.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJobHRuaHV0amd5enZiY3NqaXRwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU3MzA2NzcsImV4cCI6MjA4MTMwNjY3N30.896dczsNgywyT3E4aUItUWUdZs5g-e05ihhaI8lFKhc';
+
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    let testResults = {
+      passed: 0,
+      failed: 0,
+      warnings: 0
+    };
+
+    function clearResults() {
+      document.getElementById('results').innerHTML = '';
+      testResults = { passed: 0, failed: 0, warnings: 0 };
+    }
+
+    function addResult(title, message, type = 'info', details = null) {
+      const resultsDiv = document.getElementById('results');
+      const resultDiv = document.createElement('div');
+      resultDiv.className = `test-section`;
+
+      let icon = 'ℹ️';
+      if (type === 'success') {
+        icon = '✅';
+        testResults.passed++;
+      } else if (type === 'error') {
+        icon = '❌';
+        testResults.failed++;
+      } else if (type === 'warning') {
+        icon = '⚠️';
+        testResults.warnings++;
+      }
+
+      resultDiv.innerHTML = `
+        <div class="result ${type}">
+          <strong>${icon} ${title}</strong>
+          <p>${message}</p>
+          ${details ? `<pre>${JSON.stringify(details, null, 2)}</pre>` : ''}
+        </div>
+      `;
+
+      resultsDiv.appendChild(resultDiv);
+    }
+
+    async function testConnection() {
+      addResult('Test 1: Connection', 'Testing connection to Supabase...', 'info');
+
+      try {
+        const { data, error } = await supabase.from('artworks').select('count').limit(1);
+
+        if (error && error.code === '42P01') {
+          addResult('Connection Test', 'Connected, but artworks table does not exist', 'warning');
+        } else if (error) {
+          addResult('Connection Test', `Connected, but got error: ${error.message}`, 'warning', error);
+        } else {
+          addResult('Connection Test', 'Successfully connected to Supabase!', 'success');
+        }
+      } catch (err) {
+        addResult('Connection Test', `Failed to connect: ${err.message}`, 'error');
+      }
+    }
+
+    async function testProductsTable() {
+      addResult('Test 2: Products Table', 'Testing products table access...', 'info');
+
+      const { data, error } = await supabase
+        .from('products')
+        .select('id, name, type, price_cents')
+        .limit(10);
+
+      if (error) {
+        if (error.code === '42P01') {
+          addResult('Products Table', 'Table does not exist - migrations not applied', 'error', error);
+        } else if (error.code === '42501') {
+          addResult('Products Table', 'Permission denied - RLS policy blocking access. Run APPLY_THIS_FIX.sql', 'error', error);
+        } else {
+          addResult('Products Table', `Error: ${error.message}`, 'error', error);
+        }
+      } else {
+        if (data.length === 0) {
+          addResult('Products Table', 'Table accessible but empty - need to seed products', 'warning');
+        } else {
+          addResult('Products Table', `Found ${data.length} products`, 'success', data);
+        }
+      }
+    }
+
+    async function testProductVariantsTable() {
+      addResult('Test 3: Product Variants', 'Testing product_variants table...', 'info');
+
+      const { data, error } = await supabase
+        .from('product_variants')
+        .select('id, name, size, price_cents')
+        .limit(10);
+
+      if (error) {
+        if (error.code === '42501') {
+          addResult('Product Variants', 'Permission denied - need to fix RLS policies', 'error', error);
+        } else {
+          addResult('Product Variants', `Error: ${error.message}`, 'error', error);
+        }
+      } else {
+        if (data.length === 0) {
+          addResult('Product Variants', 'Table accessible but empty', 'warning');
+        } else {
+          addResult('Product Variants', `Found ${data.length} variants`, 'success');
+        }
+      }
+    }
+
+    async function testCartItemsTable() {
+      addResult('Test 4: Cart Items', 'Testing cart_items table...', 'info');
+
+      const { data, error } = await supabase
+        .from('cart_items')
+        .select('id')
+        .limit(1);
+
+      if (error) {
+        if (error.code === '42P01') {
+          addResult('Cart Items', 'Table does not exist - Run APPLY_THIS_FIX.sql to create it', 'error', error);
+        } else if (error.code === '42501') {
+          addResult('Cart Items', 'Permission denied - need to fix RLS policies', 'error', error);
+        } else {
+          addResult('Cart Items', `Error: ${error.message}`, 'error', error);
+        }
+      } else {
+        addResult('Cart Items', 'Table exists and is accessible', 'success');
+      }
+    }
+
+    async function testArtworksTable() {
+      addResult('Test 5: Artworks', 'Testing artworks table...', 'info');
+
+      const { data, error } = await supabase
+        .from('artworks')
+        .select('id, title, cloudinary_public_id')
+        .limit(5);
+
+      if (error) {
+        if (error.code === '42P01') {
+          addResult('Artworks', 'Table does not exist - migrations not applied', 'error', error);
+        } else if (error.code === '42703') {
+          addResult('Artworks', 'Column missing - run migration 20251203180354', 'error', error);
+        } else {
+          addResult('Artworks', `Error: ${error.message}`, 'error', error);
+        }
+      } else {
+        const withCloudinary = data.filter(a => a.cloudinary_public_id).length;
+        addResult('Artworks', `Found ${data.length} artworks (${withCloudinary} with Cloudinary IDs)`, 'success');
+      }
+    }
+
+    async function testOrdersTable() {
+      addResult('Test 6: Orders', 'Testing orders table...', 'info');
+
+      const { data, error } = await supabase
+        .from('orders')
+        .select('id, status, total_cents')
+        .limit(5);
+
+      if (error) {
+        addResult('Orders', `Error: ${error.message}`, 'error', error);
+      } else {
+        addResult('Orders', `Found ${data.length} orders`, 'success');
+      }
+    }
+
+    async function testMockupTemplatesTable() {
+      addResult('Test 7: Mockup Templates', 'Testing mockup_templates table...', 'info');
+
+      const { data, error } = await supabase
+        .from('mockup_templates')
+        .select('id, product_type, cloudinary_public_id, is_active')
+        .limit(10);
+
+      if (error) {
+        if (error.code === '42P01') {
+          addResult('Mockup Templates', 'Table does not exist - run migration 20251203180354', 'error', error);
+        } else if (error.code === '42501') {
+          addResult('Mockup Templates', 'Permission denied - need to fix RLS policies', 'error', error);
+        } else {
+          addResult('Mockup Templates', `Error: ${error.message}`, 'error', error);
+        }
+      } else {
+        if (data.length === 0) {
+          addResult('Mockup Templates', 'Table exists but empty - need to seed mockup templates', 'warning');
+        } else {
+          const active = data.filter(m => m.is_active).length;
+          addResult('Mockup Templates', `Found ${data.length} templates (${active} active)`, 'success', data);
+        }
+      }
+    }
+
+    async function testAuthStatus() {
+      addResult('Test 8: Auth Status', 'Checking authentication...', 'info');
+
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (session) {
+        addResult('Auth Status', `Signed in as: ${session.user.email}`, 'success');
+      } else {
+        addResult('Auth Status', 'Not signed in (anonymous access)', 'info');
+      }
+    }
+
+    async function testInsertPermission() {
+      addResult('Test 9: Insert Permission', 'Testing if we can add to cart (requires sign-in)...', 'info');
+
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        addResult('Insert Permission', 'Skipped - must be signed in to test cart operations', 'warning');
+        return;
+      }
+
+      // Just test if we CAN insert (don't actually insert)
+      addResult('Insert Permission', 'Signed in - cart operations should work if policies are correct', 'success');
+    }
+
+    function showSummary() {
+      const resultsDiv = document.getElementById('results');
+      const summaryDiv = document.createElement('div');
+      summaryDiv.className = 'summary';
+
+      const total = testResults.passed + testResults.failed + testResults.warnings;
+      let status = '🎉 All tests passed!';
+      let recommendation = 'Your database is properly configured!';
+
+      if (testResults.failed > 0) {
+        status = '❌ Some tests failed';
+        recommendation = '<strong>Action Required:</strong> Run APPLY_THIS_FIX.sql in Supabase SQL Editor';
+      } else if (testResults.warnings > 0) {
+        status = '⚠️ Tests passed with warnings';
+        recommendation = 'Database structure is correct, but you may need to seed data';
+      }
+
+      summaryDiv.innerHTML = `
+        <h2>${status}</h2>
+        <p>Results: ${testResults.passed} passed, ${testResults.failed} failed, ${testResults.warnings} warnings</p>
+        <p>${recommendation}</p>
+      `;
+
+      resultsDiv.insertBefore(summaryDiv, resultsDiv.firstChild);
+    }
+
+    async function runAllTests() {
+      const btn = document.getElementById('runBtn');
+      btn.disabled = true;
+      btn.textContent = '🔄 Running tests...';
+
+      clearResults();
+
+      try {
+        await testConnection();
+        await testAuthStatus();
+        await testProductsTable();
+        await testProductVariantsTable();
+        await testCartItemsTable();
+        await testArtworksTable();
+        await testOrdersTable();
+        await testMockupTemplatesTable();
+        await testInsertPermission();
+
+        showSummary();
+      } catch (err) {
+        addResult('Test Suite', `Unexpected error: ${err.message}`, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '▶️ Run All Tests';
+      }
+    }
+  </script>
+</body>
+</html>

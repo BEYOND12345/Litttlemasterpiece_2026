@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloudinary Mockup Diagnostics</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+        }
+        .test-result {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #444;
+            border-radius: 4px;
+            background: #252526;
+        }
+        .success { border-color: #4caf50; }
+        .error { border-color: #f44336; }
+        .warning { border-color: #ff9800; }
+        h2 { color: #569cd6; }
+        .url { color: #ce9178; word-break: break-all; }
+        .label { color: #9cdcfe; }
+        img { max-width: 400px; margin: 10px 0; border: 1px solid #444; }
+        pre { background: #1e1e1e; padding: 10px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Cloudinary Mockup URL Diagnostics</h1>
+    <div id="results"></div>
+
+    <script>
+        const testUrls = [
+            'https://res.cloudinary.com/dwgkdvugh/image/upload/f_auto/q_auto:good/w_1200/l_artworks:artwork_d0c39d4a-f02c-4f44-8514-71fedadd3840/w_20p,c_fit,g_center/fl_layer_apply/Mockup_phonecase_01_pzsuyp',
+            'https://res.cloudinary.com/dwgkdvugh/image/upload/f_auto/q_auto:good/w_1200/l_artworks:artwork_d0c39d4a-f02c-4f44-8514-71fedadd3840/w_25p,c_fit,g_center/fl_layer_apply/Mockup_Totebag_01_olklcl',
+            'https://res.cloudinary.com/dwgkdvugh/image/upload/f_auto/q_auto:good/w_1200/l_artworks:artwork_d0c39d4a-f02c-4f44-8514-71fedadd3840/w_45p,h_45p,c_fit,g_center/fl_layer_apply/mockups/mockups/coffee_cup',
+            'https://res.cloudinary.com/dwgkdvugh/image/upload/f_auto/q_auto:good/w_1200/l_artworks:artwork_d0c39d4a-f02c-4f44-8514-71fedadd3840/w_40p,h_40p,c_fit,g_center/fl_layer_apply/mockups/mockups/tshirt',
+            'https://res.cloudinary.com/dwgkdvugh/image/upload/f_auto/q_auto:good/w_1200/l_artworks:artwork_d0c39d4a-f02c-4f44-8514-71fedadd3840/w_65p,h_65p,c_fit,g_center/fl_layer_apply/Mockup_canvas_01_iuxou6',
+            'https://res.cloudinary.com/dwgkdvugh/image/upload/f_auto/q_auto:good/w_1200/l_artworks:artwork_d0c39d4a-f02c-4f44-8514-71fedadd3840/w_70p,h_70p,c_fit,g_center/fl_layer_apply/Mockup_card_01_r6nqhn'
+        ];
+
+        const baseImageTests = [
+            'https://res.cloudinary.com/dwgkdvugh/image/upload/Mockup_phonecase_01_pzsuyp',
+            'https://res.cloudinary.com/dwgkdvugh/image/upload/Mockup_Totebag_01_olklcl',
+            'https://res.cloudinary.com/dwgkdvugh/image/upload/mockups/mockups/coffee_cup',
+            'https://res.cloudinary.com/dwgkdvugh/image/upload/mockups/mockups/tshirt',
+            'https://res.cloudinary.com/dwgkdvugh/image/upload/Mockup_canvas_01_iuxou6',
+            'https://res.cloudinary.com/dwgkdvugh/image/upload/Mockup_card_01_r6nqhn'
+        ];
+
+        const artworkTest = 'https://res.cloudinary.com/dwgkdvugh/image/upload/artworks/artwork_d0c39d4a-f02c-4f44-8514-71fedadd3840';
+
+        const resultsDiv = document.getElementById('results');
+
+        async function testUrl(url, name) {
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'test-result';
+
+            resultDiv.innerHTML = `<h2>Testing: ${name}</h2><div class="url">${url}</div>`;
+            resultsDiv.appendChild(resultDiv);
+
+            try {
+                console.log(`\n${'='.repeat(80)}`);
+                console.log(`Testing: ${name}`);
+                console.log(`URL: ${url}`);
+
+                const response = await fetch(url);
+
+                console.log(`Status: ${response.status} ${response.statusText}`);
+                resultDiv.innerHTML += `<div><span class="label">Status:</span> ${response.status} ${response.statusText}</div>`;
+
+                const contentType = response.headers.get('content-type');
+                console.log(`Content-Type: ${contentType}`);
+                resultDiv.innerHTML += `<div><span class="label">Content-Type:</span> ${contentType}</div>`;
+
+                console.log('Response Headers:');
+                const headers = {};
+                response.headers.forEach((value, key) => {
+                    console.log(`  ${key}: ${value}`);
+                    headers[key] = value;
+                });
+                resultDiv.innerHTML += `<div><span class="label">Headers:</span><pre>${JSON.stringify(headers, null, 2)}</pre></div>`;
+
+                if (response.ok && contentType?.includes('image')) {
+                    resultDiv.className += ' success';
+                    resultDiv.innerHTML += `<div style="color: #4caf50;">✅ URL is accessible and returns an image</div>`;
+                    resultDiv.innerHTML += `<img src="${url}" alt="Mockup Preview" />`;
+                    console.log('✅ URL is accessible and returns an image');
+                } else if (response.ok) {
+                    resultDiv.className += ' warning';
+                    const text = await response.text();
+                    console.log('Response body:', text);
+                    resultDiv.innerHTML += `<div style="color: #ff9800;">⚠️ URL is accessible but not an image</div>`;
+                    resultDiv.innerHTML += `<pre>${text.substring(0, 500)}</pre>`;
+                } else {
+                    resultDiv.className += ' error';
+                    const text = await response.text();
+                    console.log('Error response:', text);
+                    resultDiv.innerHTML += `<div style="color: #f44336;">❌ URL returned error</div>`;
+                    resultDiv.innerHTML += `<pre>${text}</pre>`;
+                }
+
+                console.log('='.repeat(80));
+
+            } catch (error) {
+                console.error('Fetch failed:', error);
+                resultDiv.className += ' error';
+                resultDiv.innerHTML += `<div style="color: #f44336;">❌ Fetch failed: ${error.message}</div>`;
+            }
+        }
+
+        async function runTests() {
+            resultsDiv.innerHTML = '<h2>Testing Base Artwork Image</h2>';
+            await testUrl(artworkTest, 'Artwork Image');
+
+            resultsDiv.innerHTML += '<h2>Testing Base Mockup Templates (without overlay)</h2>';
+            for (let i = 0; i < baseImageTests.length; i++) {
+                await testUrl(baseImageTests[i], `Base Template ${i + 1}`);
+            }
+
+            resultsDiv.innerHTML += '<h2>Testing Complete Mockup URLs (with artwork overlay)</h2>';
+            for (let i = 0; i < testUrls.length; i++) {
+                await testUrl(testUrls[i], `Mockup ${i + 1}`);
+            }
+
+            resultsDiv.innerHTML += '<div class="test-result success"><h2>✅ All tests complete</h2><p>Check the browser console for detailed logs and check above for visual results.</p></div>';
+        }
+
+        runTests();
+    </script>
+</body>
+</html>

@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Mockup Placement</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+  <div class="max-w-7xl mx-auto">
+    <h1 class="text-3xl font-bold mb-2">Testing Mockup Placement</h1>
+    <p class="text-gray-600 mb-6">Using a sample flower artwork to test placement on each mockup</p>
+
+    <div id="results" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+  </div>
+
+  <script>
+    const cloudName = 'dwgkdvugh';
+
+    // Sample artwork public ID (you can change this to test with different artworks)
+    const sampleArtworkId = 'artworks/artwork_7b0e88f3-7b24-4f9f-a0fb-f6c7a892fe05';
+
+    // Sample signature
+    const sampleSignature = {
+      text: 'Lucy',
+      descriptor: 'AGE 5',
+      position: { x: 88, y: 88 },
+      color: '#29251C'
+    };
+
+    const mockups = [
+      {
+        name: 'Coffee Mug Display',
+        publicId: 'mockups/mockups/coffee_cup',
+        config: {
+          width: '22%',
+          height: '22%',
+          gravity: 'center',
+          left: '-8%',
+          top: '5%'
+        }
+      },
+      {
+        name: 'T-Shirt Lifestyle Shot',
+        publicId: 'mockups/mockups/tshirt',
+        config: {
+          width: '25%',
+          height: '25%',
+          gravity: 'center',
+          left: '0%',
+          top: '8%'
+        }
+      },
+      {
+        name: 'Tote Bag on Table',
+        publicId: 'mockups/mockups/totebag',
+        config: {
+          width: '28%',
+          height: '28%',
+          gravity: 'center',
+          left: '0%',
+          top: '-10%'
+        }
+      },
+      {
+        name: 'Canvas on Wooden Shelf',
+        publicId: 'Mockup_canvas_01_iuxou6',
+        config: {
+          width: '65%',
+          height: '65%',
+          gravity: 'center',
+          left: '0%',
+          top: '0%'
+        }
+      },
+      {
+        name: 'Phone Case Display',
+        publicId: 'Mockup_phonecase_01_pzsuyp',
+        config: {
+          width: '20%',
+          height: '20%',
+          gravity: 'center',
+          left: '-5%',
+          top: '-15%'
+        }
+      },
+      {
+        name: 'Framed Art on Gallery Wall',
+        publicId: 'Mockup_card_01_r6nqhn',
+        config: {
+          width: '70%',
+          height: '70%',
+          gravity: 'center',
+          left: '0%',
+          top: '5%'
+        }
+      },
+      {
+        name: 'Large Wall Frame',
+        publicId: 'Mockup_LargeFrame_01_so8gai',
+        config: {
+          width: '60%',
+          height: '60%',
+          gravity: 'center',
+          left: '0%',
+          top: '-5%'
+        }
+      }
+    ];
+
+    function buildMockupUrl(mockupPublicId, artworkPublicId, config, signature) {
+      // Convert artwork public ID slashes to colons for layer overlay
+      const artworkLayer = artworkPublicId.replace(/\//g, ':');
+
+      // Build transformation parameters
+      const transforms = [];
+
+      // Base transformations
+      transforms.push('f_auto');
+      transforms.push('q_auto:good');
+      transforms.push('w_800');
+
+      // Add artwork as layer
+      transforms.push(`l_${artworkLayer}`);
+
+      // Build overlay transformations
+      const overlayTransforms = [];
+
+      if (config.width) {
+        const widthValue = config.width.replace('%', '');
+        const widthDecimal = (parseInt(widthValue) / 100).toFixed(2);
+        overlayTransforms.push(`w_${widthDecimal}`);
+        overlayTransforms.push('fl_relative');
+      }
+
+      if (config.height) {
+        const heightValue = config.height.replace('%', '');
+        const heightDecimal = (parseInt(heightValue) / 100).toFixed(2);
+        overlayTransforms.push(`h_${heightDecimal}`);
+        overlayTransforms.push('fl_relative');
+      }
+
+      overlayTransforms.push('c_fit');
+
+      if (config.gravity) {
+        overlayTransforms.push(`g_${config.gravity}`);
+      }
+
+      if (config.left) {
+        const leftValue = config.left.replace('%', '');
+        overlayTransforms.push(`x_${leftValue}`);
+      }
+
+      if (config.top) {
+        const topValue = config.top.replace('%', '');
+        overlayTransforms.push(`y_${topValue}`);
+      }
+
+      transforms.push(overlayTransforms.join(','));
+      transforms.push('fl_layer_apply');
+
+      // Signature temporarily disabled - needs proper coordinate calculation
+      // relative to artwork placement on mockup
+
+      return `https://res.cloudinary.com/${cloudName}/image/upload/${transforms.join('/')}/${mockupPublicId}`;
+    }
+
+    const resultsDiv = document.getElementById('results');
+
+    mockups.forEach((mockup) => {
+      const url = buildMockupUrl(mockup.publicId, sampleArtworkId, mockup.config, sampleSignature);
+
+      const card = document.createElement('div');
+      card.className = 'bg-white rounded-lg shadow-lg overflow-hidden';
+      card.innerHTML = `
+        <div class="relative bg-gray-200">
+          <div class="aspect-square flex items-center justify-center">
+            <div class="loader text-gray-400">Loading...</div>
+          </div>
+        </div>
+        <div class="p-4">
+          <h3 class="font-bold text-lg mb-2">${mockup.name}</h3>
+          <div class="text-xs space-y-1 mb-3">
+            <div class="flex justify-between">
+              <span class="text-gray-600">Size:</span>
+              <span class="font-mono">${mockup.config.width} × ${mockup.config.height}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-600">Position:</span>
+              <span class="font-mono">x:${mockup.config.left} y:${mockup.config.top}</span>
+            </div>
+          </div>
+          <div class="status text-sm font-medium"></div>
+        </div>
+      `;
+
+      resultsDiv.appendChild(card);
+
+      const img = new Image();
+      const imgContainer = card.querySelector('.aspect-square');
+      const statusDiv = card.querySelector('.status');
+
+      img.onload = function() {
+        imgContainer.innerHTML = '';
+        img.className = 'w-full h-full object-cover';
+        imgContainer.appendChild(img);
+        statusDiv.innerHTML = '<span class="text-green-600">✓ Loaded</span>';
+      };
+
+      img.onerror = function() {
+        imgContainer.innerHTML = '<div class="text-red-500 text-center p-4">Failed to load</div>';
+        statusDiv.innerHTML = '<span class="text-red-600">✗ Error</span>';
+        console.error('Failed to load:', url);
+      };
+
+      img.src = url;
+      console.log(`${mockup.name}:`, url);
+    });
+  </script>
+</body>
+</html>

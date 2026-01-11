@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test All Mockup Templates</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+  <div class="max-w-6xl mx-auto">
+    <h1 class="text-3xl font-bold mb-6">Testing All 7 Mockup Templates</h1>
+
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+      <p class="text-sm text-blue-900">
+        Loading all mockup template images from Cloudinary to verify they work...
+      </p>
+    </div>
+
+    <div id="results" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+  </div>
+
+  <script>
+    const cloudName = 'dwgkdvugh';
+
+    const mockups = [
+      { name: 'Canvas on Wooden Shelf', publicId: 'Mockup_canvas_01_iuxou6', type: 'canvas' },
+      { name: 'Framed Art on Gallery Wall', publicId: 'Mockup_card_01_r6nqhn', type: 'frame' },
+      { name: 'Large Wall Frame', publicId: 'Mockup_LargeFrame_01_so8gai', type: 'frame' },
+      { name: 'Coffee Mug Display', publicId: 'mockups/mockups/coffee_cup', type: 'mug' },
+      { name: 'Phone Case Display', publicId: 'Mockup_phonecase_01_pzsuyp', type: 'phone' },
+      { name: 'Tote Bag on Table', publicId: 'mockups/mockups/totebag', type: 'tote' },
+      { name: 'T-Shirt Lifestyle Shot', publicId: 'mockups/mockups/tshirt', type: 'tshirt' }
+    ];
+
+    const resultsDiv = document.getElementById('results');
+
+    mockups.forEach((mockup, index) => {
+      const url = `https://res.cloudinary.com/${cloudName}/image/upload/f_auto,q_auto:good,w_400/${mockup.publicId}`;
+
+      const card = document.createElement('div');
+      card.className = 'bg-white rounded-lg shadow-lg overflow-hidden';
+      card.innerHTML = `
+        <div class="relative">
+          <div class="aspect-square bg-gray-200 flex items-center justify-center">
+            <div class="loader text-gray-400">Loading...</div>
+          </div>
+        </div>
+        <div class="p-4">
+          <h3 class="font-bold text-lg mb-1">${mockup.name}</h3>
+          <p class="text-sm text-gray-600 mb-2">${mockup.type}</p>
+          <code class="text-xs bg-gray-100 px-2 py-1 rounded block break-all">${mockup.publicId}</code>
+          <div class="status mt-3 text-sm font-medium"></div>
+        </div>
+      `;
+
+      resultsDiv.appendChild(card);
+
+      const img = new Image();
+      const imgContainer = card.querySelector('.aspect-square');
+      const statusDiv = card.querySelector('.status');
+
+      img.onload = function() {
+        imgContainer.innerHTML = '';
+        img.className = 'w-full h-full object-cover';
+        imgContainer.appendChild(img);
+        statusDiv.innerHTML = '<span class="text-green-600">✓ Working!</span>';
+      };
+
+      img.onerror = function() {
+        imgContainer.innerHTML = '<div class="text-red-500 text-center p-4">Failed to load</div>';
+        statusDiv.innerHTML = '<span class="text-red-600">✗ Error loading image</span>';
+      };
+
+      img.src = url;
+    });
+  </script>
+</body>
+</html>

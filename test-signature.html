@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signature Test - Cloudinary</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h2 {
+            color: #333;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .url-box {
+            background: #f9f9f9;
+            padding: 15px;
+            border-left: 4px solid #2196F3;
+            margin: 10px 0;
+            word-break: break-all;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        img {
+            max-width: 100%;
+            border: 1px solid #ddd;
+            margin: 10px 0;
+        }
+        .explanation {
+            background: #fff3cd;
+            padding: 15px;
+            border-left: 4px solid #ffc107;
+            margin: 10px 0;
+        }
+        .success {
+            background: #d4edda;
+            border-left-color: #28a745;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎨 Signature on Product Mockups - Test Results</h1>
+
+    <div class="test-section">
+        <h2>✅ Issue Fixed</h2>
+        <div class="explanation success">
+            <strong>Problem:</strong> Signatures were not appearing on product mockups.<br><br>
+            <strong>Root Cause:</strong> The signature feature was disabled (marked as TODO) and when re-enabled, the positioning was incorrect.<br><br>
+            <strong>Solution:</strong> Re-enabled signature overlays using Cloudinary's nested transformation syntax. The signature is now added as a sub-layer within the artwork layer, ensuring it stays positioned at the bottom-right of the artwork regardless of how the artwork is placed on different products.
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>📋 How It Works</h2>
+        <div class="explanation">
+            <p><strong>Cloudinary Transformation Strategy:</strong></p>
+            <ol>
+                <li>Load the base mockup image (e.g., t-shirt, mug, frame)</li>
+                <li>Add the child's artwork as an overlay layer</li>
+                <li><strong>Within the artwork layer</strong>, add the signature text at bottom-right (g_south_east, x_25, y_25)</li>
+                <li>Apply the combined artwork+signature to the mockup with proper positioning and sizing</li>
+            </ol>
+            <p><strong>URL Format:</strong></p>
+            <code>
+                /l_artworks:artwork_ID/l_text:Arial_36_bold:CHILDNAME,co_rgb:COLOR,g_south_east,x_25,y_25/fl_layer_apply/
+            </code>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>🔄 How to See Your Signature</h2>
+        <div class="explanation">
+            <p><strong>For Existing Artworks:</strong></p>
+            <ol>
+                <li>Open your artwork in the product gallery</li>
+                <li>Click the new <strong>"Refresh Mockups"</strong> button in the top-right corner</li>
+                <li>Wait for all mockups to regenerate (this will take a few moments)</li>
+                <li>The signature will now appear at the bottom-right of the artwork on all products</li>
+            </ol>
+            <p><strong>For New Artworks:</strong></p>
+            <p>Signatures will automatically appear on all mockups when you create new artwork.</p>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>🔍 Example Transformation URL</h2>
+        <p>Here's what a working mockup URL with signature looks like:</p>
+        <div class="url-box">
+https://res.cloudinary.com/YOUR_CLOUD_NAME/image/upload/
+f_auto/q_auto:good/w_1200/
+l_artworks:artwork_136cb4bd-8e2d-45fb-a48d-c31259cd61b4/
+l_text:Arial_36_bold:EMMA,co_rgb:29251C,g_south_east,x_25,y_25/
+fl_layer_apply/
+w_0.65,fl_relative,h_0.65,fl_relative,c_fit,g_center,x_0,y_0/
+fl_layer_apply/
+Mockup_canvas_01
+        </div>
+        <p><strong>Breakdown:</strong></p>
+        <ul>
+            <li><code>l_artworks:artwork_ID</code> - Load the artwork</li>
+            <li><code>l_text:Arial_36_bold:EMMA</code> - Add text "EMMA" in bold Arial 36pt</li>
+            <li><code>co_rgb:29251C</code> - Text color (dark brown)</li>
+            <li><code>g_south_east</code> - Position at bottom-right</li>
+            <li><code>x_25,y_25</code> - 25px padding from edges</li>
+            <li><code>fl_layer_apply</code> - Apply text to artwork</li>
+            <li>Then size/position the artwork+signature on the mockup</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h2>🎯 Testing Steps</h2>
+        <ol>
+            <li>✅ Open the browser console (F12) to see detailed logs</li>
+            <li>✅ Navigate to an artwork with a signature in the product gallery</li>
+            <li>✅ Click "Refresh Mockups" button</li>
+            <li>✅ Watch console logs for signature processing</li>
+            <li>✅ Verify signature appears at bottom-right of artwork in mockups</li>
+        </ol>
+    </div>
+
+    <div class="test-section">
+        <h2>💡 Signature Positioning</h2>
+        <div class="explanation">
+            <p><strong>Why bottom-right positioning?</strong></p>
+            <p>The signature is positioned at the bottom-right corner of the artwork (not the mockup) so it:</p>
+            <ul>
+                <li>Stays with the artwork regardless of product type</li>
+                <li>Appears consistently across all mockups (t-shirt, mug, frame, etc.)</li>
+                <li>Maintains proper spacing from the artwork edges (25px)</li>
+                <li>Uses appropriate text color based on artwork background (light/dark contrast)</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>
