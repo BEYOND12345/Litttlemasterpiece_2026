@@ -23,6 +23,7 @@ import {
 import { cloudinaryService } from '../services/cloudinaryService';
 import { mockupService } from '../services/mockupService';
 import { compressImage } from '../utils/imageCompression';
+import { measureSharpness, SharpnessResult } from '../utils/sharpness';
 
 interface SimplifiedStudioProps {
   onComplete: (artwork: Artwork) => void;
@@ -47,6 +48,12 @@ export const SimplifiedStudio: React.FC<SimplifiedStudioProps> = ({
   const [uploadedButNotStarted, setUploadedButNotStarted] = useState(false);
   const [processingStep, setProcessingStep] = useState<string>('');
   const [rawOriginalUrl, setRawOriginalUrl] = useState<string>('');
+  // Blur check on the raw upload, before anything is processed or paid for.
+  const [sharpness, setSharpness] = useState<SharpnessResult | null>(null);
+  const [checkingSharpness, setCheckingSharpness] = useState(false);
+  const [useBlurryAnyway, setUseBlurryAnyway] = useState(false);
+  // A slow check on an earlier photo must not overwrite the current photo's.
+  const sharpnessRequest = useRef(0);
 
   // V1 Simple Controls
   const [scale, setScale] = useState<number>(1);
@@ -193,8 +200,32 @@ export const SimplifiedStudio: React.FC<SimplifiedStudioProps> = ({
       const rawBase64 = reader.result as string;
       setRawOriginalUrl(rawBase64);
       setUploadedButNotStarted(true);
+
+      const request = ++sharpnessRequest.current;
+      setSharpness(null);
+      setUseBlurryAnyway(false);
+      setCheckingSharpness(true);
+      measureSharpness(rawBase64)
+        .then((result) => {
+          if (request === sharpnessRequest.current) setSharpness(result);
+        })
+        .catch((err) => {
+          // A check that cannot run must not block the upload.
+          console.warn('Blur check failed, allowing the photo:', err);
+        })
+        .finally(() => {
+          if (request === sharpnessRequest.current) setCheckingSharpness(false);
+        });
     };
     reader.readAsDataURL(file);
+  };
+
+  const retakePhoto = () => {
+    setRawOriginalUrl('');
+    setUploadedButNotStarted(false);
+    setSharpness(null);
+    setUseBlurryAnyway(false);
+    fileInputRef.current?.click();
   };
 
   const handleStartTransformation = () => {
@@ -830,26 +861,63 @@ export const SimplifiedStudio: React.FC<SimplifiedStudioProps> = ({
                   className="w-full h-full object-contain"
                 />
               </div>
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={handleStartTransformation}
-                  className="flex-1 px-6 py-4 bg-terracotta hover:bg-terracotta/90 text-white text-base font-medium rounded-lg transition-all flex items-center justify-center gap-3 shadow-md hover:shadow-lg group"
-                >
-                  <Sparkles className="group-hover:rotate-12 transition-transform" size={20} />
-                  Start Transformation
-                  <ArrowRight className="group-hover:translate-x-1 transition-transform" size={20} />
-                </button>
-                <button
-                  onClick={() => {
-                    setRawOriginalUrl('');
-                    setUploadedButNotStarted(false);
-                    fileInputRef.current?.click();
-                  }}
-                  className="px-6 py-4 border-2 border-stone-200 hover:border-stone-300 bg-white text-stone-700 text-base font-medium rounded-lg transition-all"
-                >
-                  Change Photo
-                </button>
-              </div>
+              {sharpness?.verdict === 'blurry' && !useBlurryAnyway ? (
+                <>
+                  <div
+                    role="alert"
+                    data-testid="blur-warning"
+                    className="border-2 border-terracotta/30 bg-white rounded-lg p-5 text-stone-700"
+                  >
+                    <p className="font-serif text-xl text-stone-900">This photo looks blurry</p>
+                    <p className="text-sm mt-2">
+                      Blur shows far more on a framed print than on a phone screen. Lay the drawing flat in good
+                      light, hold the phone still directly above it, and take the photo again.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <button
+                      onClick={retakePhoto}
+                      className="flex-1 px-6 py-4 bg-terracotta hover:bg-terracotta/90 text-white text-base font-medium rounded-lg transition-all flex items-center justify-center gap-3 shadow-md hover:shadow-lg"
+                    >
+                      <Upload size={20} />
+                      Retake Photo
+                    </button>
+                    <button
+                      onClick={() => setUseBlurryAnyway(true)}
+                      className="px-6 py-4 border-2 border-stone-200 hover:border-stone-300 bg-white text-stone-700 text-base font-medium rounded-lg transition-all"
+                    >
+                      Use It Anyway
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={handleStartTransformation}
+                    disabled={checkingSharpness}
+                    className="flex-1 px-6 py-4 bg-terracotta hover:bg-terracotta/90 text-white text-base font-medium rounded-lg transition-all flex items-center justify-center gap-3 shadow-md hover:shadow-lg group disabled:opacity-60 disabled:cursor-wait"
+                  >
+                    {checkingSharpness ? (
+                      <>
+                        <Loader2 className="animate-spin" size={20} />
+                        Checking Photo
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="group-hover:rotate-12 transition-transform" size={20} />
+                        Start Transformation
+                        <ArrowRight className="group-hover:translate-x-1 transition-transform" size={20} />
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={retakePhoto}
+                    className="px-6 py-4 border-2 border-stone-200 hover:border-stone-300 bg-white text-stone-700 text-base font-medium rounded-lg transition-all"
+                  >
+                    Change Photo
+                  </button>
+                </div>
+              )}
               <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
             </div>
           )}

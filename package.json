@@ -8,7 +8,9 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json"
+    "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "batch-test": "node scripts/batch-test.mjs",
+    "standin-photos": "python3 scripts/make-standin-photos.py"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
