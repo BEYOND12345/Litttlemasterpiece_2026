@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Drive /batch-test headlessly over a folder of photos and print the Phase 1
- * self-check: every output's dimensions, flagged when the long edge is under
- * 3000px, plus each photo's blur verdict and which network path ran.
+ * Drive /batch-test headlessly over a folder of photos and print the
+ * self-check: each photo's blur verdict and preview time, then every print
+ * file's size and real dpi, flagged when the long edge is under 3000px.
  *
  *   npm run batch-test -- <photo-dir> [--out <dir>]
  *
@@ -14,9 +14,8 @@
  * numbers can be pasted, not paraphrased.
  *
  * It starts its OWN vite server on a free port and refuses a port that
- * already answers, so it can never be reading an older server's code. It
- * runs whatever keys are in .env: with none, the pipeline takes the local
- * fallbacks, and the printed network column says so.
+ * already answers, so it can never be reading an older server's code. The
+ * image path makes no network calls; the network column proves it.
  *
  * Needs Playwright with Chromium (not a project dependency):
  *   npm i --no-save playwright && npx playwright install chromium
@@ -152,18 +151,18 @@ try {
   writeFileSync(join(outDir, 'results.json'), JSON.stringify(rows, null, 2) + '\n');
   await page.screenshot({ path: join(outDir, 'contact-sheet.png'), fullPage: true });
 
-  console.log('\nBLUR CHECK (run on the raw photo, before processing)');
-  console.log('photo                      source       dpi@A3  verdict   score  VoL     network');
+  console.log('\nPER PHOTO (blur check on the raw photo; preview = the wait a parent sees)');
+  console.log('photo                      source       blur     score  preview  print   page                          inks                     network');
   for (const r of rows) {
     const s = r.sharpness || {};
     const net = r.network.length ? r.network.map((n) => `${n.host} ${n.status}`).join(', ') : 'none';
     console.log(
-      `${r.name.padEnd(26)} ${`${r.nativeWidth}x${r.nativeHeight}`.padEnd(12)} ${String(r.sourceDpiAtA3).padStart(6)}  ${String(s.verdict).padEnd(8)} ${s.score == null ? '  n/a' : s.score.toFixed(2)}  ${s.laplacianVariance == null ? 'n/a' : s.laplacianVariance.toFixed(0).padStart(6)}  ${net}`,
+      `${r.name.padEnd(26)} ${`${r.nativeWidth}x${r.nativeHeight}`.padEnd(12)} ${String(s.verdict).padEnd(8)} ${s.score == null ? '  n/a' : s.score.toFixed(2)}  ${(r.previewMs / 1000).toFixed(1).padStart(5)}s  ${(r.printMs / 1000).toFixed(1).padStart(5)}s  ${String(r.paper).padEnd(29)} ${r.inks.join('+').padEnd(24)} ${net}`,
     );
   }
 
-  console.log('\nOUTPUTS (brief: long edge >= 3000px; true 300dpi A3 needs 4961px)');
-  console.log('photo                      style            size         long   >=3000  >=4961  secs');
+  console.log('\nPRINT FILES (brief: long edge >= 3000px)');
+  console.log('photo                      look             size         long   >=3000  dpi@A4  dpi@A3');
   let n = 0;
   let short = 0;
   for (const r of rows) {
@@ -176,7 +175,7 @@ try {
       if (!o.meetsBrief) short++;
       if (o.error) code = 1;
       console.log(
-        `${r.name.padEnd(26)} ${o.style.padEnd(16)} ${(o.error ? 'ERROR' : `${o.width}x${o.height}`).padEnd(12)} ${String(o.longEdge).padStart(5)}   ${o.meetsBrief ? 'yes' : 'SHORT'}     ${o.meets300dpi ? 'yes' : 'no '}   ${(o.ms / 1000).toFixed(1).padStart(5)}${o.error ? `  ${o.error}` : ''}`,
+        `${r.name.padEnd(26)} ${o.style.padEnd(16)} ${(o.error ? 'ERROR' : `${o.width}x${o.height}`).padEnd(12)} ${String(o.longEdge).padStart(5)}   ${o.meetsBrief ? 'yes  ' : 'SHORT'}   ${String(o.dpiA4).padStart(5)}   ${String(o.dpiA3).padStart(5)}${o.error ? `  ${o.error}` : ''}`,
       );
     }
   }
