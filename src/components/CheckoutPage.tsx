@@ -6,6 +6,7 @@ import { ArrowLeft, Package, CreditCard, ShoppingBag, Loader2 } from 'lucide-rea
 import { createOrder } from '../services/orderService';
 import { getCurrentUser } from '../services/authService';
 import { getAllProducts } from '../services/productService';
+import { getProductVariants } from '../services/cartService';
 import { mockupService } from '../services/mockupService';
 import { supabase } from '../services/supabaseClient';
 
@@ -16,7 +17,7 @@ interface CheckoutPageProps {
 }
 
 export const CheckoutPage: React.FC<CheckoutPageProps> = ({ onBack, onOrderComplete, artwork }) => {
-  const { cartItems, cartTotal, clearAllItems } = useCart();
+  const { cartItems, cartTotal, clearAllItems, addToCart } = useCart();
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -179,7 +180,17 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ onBack, onOrderCompl
     if (!currentArtwork || !selectedProduct) return;
 
     try {
-      await addItem(currentArtwork, selectedProduct, quantity);
+      // Checkout picks a Product; the cart holds a ProductVariant (cart_items
+      // .product_variant_id is a foreign key to product_variants). Resolve the
+      // product's first available variant rather than passing the product
+      // through, which would insert a product id into the variant column.
+      const variants = await getProductVariants(selectedProduct.id);
+      const variant = variants[0];
+      if (!variant) {
+        setError('This product is not available to order yet');
+        return;
+      }
+      await addToCart(currentArtwork, variant, quantity);
       setShowCheckoutForm(true);
     } catch (err) {
       console.error('Failed to add to cart:', err);

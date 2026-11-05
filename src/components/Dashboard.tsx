@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { Artwork, User } from '../types/types';
+import { Artwork, ArtStyle, User } from '../types/types';
 import { getUserArtworks, deleteArtwork } from '../services/artworkService';
 import { Button } from './Button';
 import { Plus, Trash2 } from 'lucide-react';
