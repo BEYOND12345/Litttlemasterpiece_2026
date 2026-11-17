@@ -264,6 +264,10 @@ export async function measureSharpness(src: string | Blob): Promise<SharpnessRes
     canvas.height = h;
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) throw new Error('No canvas context');
+    // White under the photo, as in src/pipeline/looks.ts: a transparent PNG
+    // would otherwise be measured as a black page.
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, w, h);
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(img, 0, 0, w, h);

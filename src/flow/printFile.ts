@@ -10,7 +10,7 @@
  *            screen print's cream is divided back out so the inks sit on the
  *            white mug, exactly as the mug preview shows it.
  */
-import { PRINT_LONG_EDGE, type LookId, makeLooks, toCanvas } from '../pipeline/looks';
+import { PRINT_LONG_EDGE, type LookDecisions, type LookId, makeLooks, toCanvas } from '../pipeline/looks';
 import { onWhite, posterOnSheet, type ProductId } from './mockups';
 import { orientSheet, placeArt, type Size } from './printGeometry';
 
@@ -38,8 +38,18 @@ const toPng = (c: HTMLCanvasElement) =>
     c.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not make the print file'))), 'image/png'),
   );
 
-export async function makePrintFile(photo: string, look: LookId, product: ProductId, print: Size): Promise<Blob> {
-  const res = await makeLooks(photo, { longEdge: PRINT_LONG_EDGE });
+/**
+ * `decisions` are the preview's (crop, stretch, inks): passing them makes the
+ * print the preview at more pixels, so the parent gets the inks they saw.
+ */
+export async function makePrintFile(
+  photo: string,
+  look: LookId,
+  product: ProductId,
+  print: Size,
+  decisions?: LookDecisions,
+): Promise<Blob> {
+  const res = await makeLooks(photo, { longEdge: PRINT_LONG_EDGE, decisions });
   const chosen = res.looks.find((l) => l.id === look);
   if (!chosen) throw new Error(`No ${look} look`);
   const art = toCanvas(chosen.image);

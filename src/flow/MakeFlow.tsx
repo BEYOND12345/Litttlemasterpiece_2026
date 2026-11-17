@@ -17,15 +17,17 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Check, Loader2, Upload } from 'lucide-react';
 import { measureSharpness } from '../utils/sharpness';
-import { LookId, makeLooks, toCanvas } from '../pipeline/looks';
+import { LookDecisions, LookId, MIN_INK_COVERAGE, makeLooks, toCanvas } from '../pipeline/looks';
 import { ProductId, productMockup } from './mockups';
 import { PRODUCTS, formatAud } from './products';
 
 export interface OrderSelection {
-  /** The original photo, kept so the print file is made from it at full size. */
+  /** The original photo (an object URL), kept so the print file is made from it at full size. */
   photo: string;
   look: LookId;
   product: ProductId;
+  /** The preview's crop, stretch and inks, so the print matches what the parent saw. */
+  decisions: LookDecisions;
 }
 
 interface MakeFlowProps {
@@ -33,20 +35,13 @@ interface MakeFlowProps {
   onOrder: (selection: OrderSelection) => void;
 }
 
-type Step = 'pick' | 'working' | 'blurry' | 'choose' | 'failed';
+type Step = 'pick' | 'working' | 'blurry' | 'empty' | 'choose' | 'failed';
 
 const LOOKS: { id: LookId; name: string; blurb: string }[] = [
   { id: 'as_drawn', name: 'As drawn', blurb: 'Cleaned up, exactly as they drew it' },
   { id: 'screen_print', name: 'Screen print', blurb: 'Their drawing in bold, flat inks' },
 ];
 
-const readFile = (file: File) =>
-  new Promise<string>((resolve, reject) => {
-    const r = new FileReader();
-    r.onloadend = () => resolve(r.result as string);
-    r.onerror = () => reject(r.error);
-    r.readAsDataURL(file);
-  });
 
 export const MakeFlow: React.FC<MakeFlowProps> = ({ initialFile, onOrder }) => {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -57,15 +52,29 @@ export const MakeFlow: React.FC<MakeFlowProps> = ({ initialFile, onOrder }) => {
   const [look, setLook] = useState<LookId | null>(null);
   const [product, setProduct] = useState<ProductId | null>(null);
   const [mockups, setMockups] = useState<Record<string, string>>({});
+  const [decisions, setDecisions] = useState<LookDecisions | null>(null);
+  const [smallSheet, setSmallSheet] = useState(false);
   // A slow run on an earlier photo must not land on top of the current one.
   const run = useRef(0);
+  // The photo as an object URL, not a data URL: a 12MP photo as base64 is a
+  // string of about 5MB, decoded again on every use (review, 2026-11-17).
+  const photoUrl = useRef('');
+  useEffect(() => () => { if (photoUrl.current) URL.revokeObjectURL(photoUrl.current); }, []);
 
   const makeLooksFor = async (src: string, id: number) => {
     const res = await makeLooks(src);
     if (id !== run.current) return;
+    // A photo with no marks in it (a blank page, a photo of the table)
+    // must not become an order for an empty print.
+    if (res.inkCoverage < MIN_INK_COVERAGE) {
+      setStep('empty');
+      return;
+    }
     const canvases = Object.fromEntries(res.looks.map((l) => [l.id, toCanvas(l.image)])) as Record<LookId, HTMLCanvasElement>;
     setLooks(canvases);
     setLookUrls(Object.fromEntries(Object.entries(canvases).map(([k, c]) => [k, c.toDataURL('image/jpeg', 0.88)])));
+    setDecisions(res.decisions);
+    setSmallSheet(res.paperReason === 'sheet is small in the photo');
     setStep('choose');
   };
 
@@ -76,10 +85,13 @@ export const MakeFlow: React.FC<MakeFlowProps> = ({ initialFile, onOrder }) => {
     setLook(null);
     setProduct(null);
     setMockups({});
+    setDecisions(null);
+    setSmallSheet(false);
     setStep('working');
     try {
-      const src = await readFile(file);
-      if (id !== run.current) return;
+      if (photoUrl.current) URL.revokeObjectURL(photoUrl.current);
+      const src = URL.createObjectURL(file);
+      photoUrl.current = src;
       setPhoto(src);
       // The blur check is local and takes a fraction of a second. A check
       // that cannot run must not block the photo.
@@ -114,10 +126,10 @@ export const MakeFlow: React.FC<MakeFlowProps> = ({ initialFile, onOrder }) => {
     setMockups(next);
   }, [looks, look]);
 
+  // Opens the picker and changes nothing yet: the current photo and looks
+  // stay until a new photo actually arrives, so cancelling the picker loses
+  // nothing (it used to clear them first).
   const chooseAgain = () => {
-    run.current++;
-    setStep('pick');
-    setPhoto('');
     inputRef.current?.click();
   };
 
@@ -163,9 +175,22 @@ export const MakeFlow: React.FC<MakeFlowProps> = ({ initialFile, onOrder }) => {
         )}
 
         {step === 'working' && (
-          <div className="text-center py-16" data-testid="flow-working">
+          <div className="text-center py-16" data-testid="flow-working" role="status" aria-live="polite">
             <Loader2 className="animate-spin mx-auto text-terracotta mb-4" size={36} />
             <p className="font-serif text-2xl text-stone-900">Getting it ready</p>
+          </div>
+        )}
+
+        {step === 'empty' && (
+          <div className="space-y-5" data-testid="flow-empty">
+            <img src={photo} alt="Your photo" className="w-full max-h-80 object-contain rounded-lg border border-stone-200 bg-white" />
+            <div role="alert" className="border-2 border-terracotta/30 bg-white rounded-lg p-5 text-stone-700">
+              <p className="font-serif text-xl text-stone-900">We couldn't find a drawing in this photo</p>
+              <p className="text-sm mt-2">Make sure the drawing is in the picture, in good light, and try again.</p>
+            </div>
+            <button onClick={chooseAgain} className="w-full min-h-[52px] px-6 py-3 bg-terracotta text-white rounded-lg font-medium flex items-center justify-center gap-2">
+              <Upload size={20} /> Choose another photo
+            </button>
           </div>
         )}
 
@@ -207,6 +232,14 @@ export const MakeFlow: React.FC<MakeFlowProps> = ({ initialFile, onOrder }) => {
 
         {step === 'choose' && looks && (
           <div className="space-y-10">
+            {smallSheet && (
+              <div data-testid="flow-small-sheet" className="border border-stone-200 bg-white rounded-lg p-4 text-sm text-stone-700 flex items-start justify-between gap-3">
+                <span>The drawing looks small in this photo. For the sharpest print, take it closer so the paper fills the frame.</span>
+                <button onClick={chooseAgain} className="shrink-0 min-h-[44px] px-3 text-terracotta font-medium underline">
+                  Retake
+                </button>
+              </div>
+            )}
             <section>
               <h2 className="font-serif text-2xl text-stone-900 mb-1">Pick a look</h2>
               <p className="text-sm text-stone-600 mb-4">Same drawing, two ways. Nothing is redrawn.</p>
@@ -278,10 +311,10 @@ export const MakeFlow: React.FC<MakeFlowProps> = ({ initialFile, onOrder }) => {
               />
             )}
 
-            {look && selected && (
+            {look && selected && decisions && (
               <button
                 data-testid="flow-order"
-                onClick={() => onOrder({ photo, look, product: selected.id })}
+                onClick={() => onOrder({ photo, look, product: selected.id, decisions })}
                 className="w-full min-h-[56px] px-6 py-4 bg-terracotta hover:bg-terracotta/90 text-white text-lg font-medium rounded-lg shadow-md"
               >
                 Order {selected.name.toLowerCase()} · {formatAud(selected.priceCents)}

@@ -62,27 +62,52 @@ const hash = (x: number, y: number) => {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 };
 
+/**
+ * Every choice the screen print makes about a drawing: its colours, the inks
+ * they snap to, and where ink starts. The preview makes these choices; the
+ * print file reuses them, so the inks printed are the inks the parent saw.
+ * (Decided twice, a kraft-paper drawing previewed Red + Navy and printed
+ * Red + Charcoal. Found by review on 2026-11-17.)
+ */
+export interface ScreenPrintPalette {
+  centres: number[][];
+  inkOf: number[];
+  used: number[];
+  lo: number;
+  span: number;
+}
+
 export interface ScreenPrintResult {
   image: Raster;
   inks: string[];
+  palette: ScreenPrintPalette;
 }
 
-export function screenPrint(clean: Raster, paper: readonly [number, number, number] = PAPER.cream): ScreenPrintResult {
+/** At most this many inks, as a real screen print would have. */
+const MAX_INKS = 4;
+
+export function screenPrint(
+  clean: Raster,
+  paper: readonly [number, number, number] = PAPER.cream,
+  fixed?: ScreenPrintPalette,
+): ScreenPrintResult {
   const { width: W, height: H, data } = clean;
   const n = W * H;
 
   // 1. The drawing's own colours: cluster the solidly inked pixels.
+  let centres: number[][] = fixed ? fixed.centres : [];
   const samples: number[][] = [];
-  const stride = Math.max(1, Math.floor(n / 60000));
-  for (let i = 0; i < n; i += stride) {
-    const p = i * 4;
-    if (darkness(data, p) > 0.45) samples.push(toLab(data[p], data[p + 1], data[p + 2]));
+  if (!fixed) {
+    const stride = Math.max(1, Math.floor(n / 60000));
+    for (let i = 0; i < n; i += stride) {
+      const p = i * 4;
+      if (darkness(data, p) > 0.45) samples.push(toLab(data[p], data[p + 1], data[p + 2]));
+    }
   }
-  let centres: number[][] = [];
   if (samples.length) {
     // Farthest-point start, deterministic: darkest sample first.
     centres.push(samples.reduce((a, b) => (b[0] < a[0] ? b : a)));
-    while (centres.length < 3) {
+    while (centres.length < MAX_INKS) {
       let far = samples[0], fd = -1;
       for (const s of samples) {
         const d = Math.min(...centres.map((c) => labDist(s, c)));
@@ -98,8 +123,17 @@ export function screenPrint(clean: Raster, paper: readonly [number, number, numb
         centres.forEach((c, j) => { const d = labDist(s, c); if (d < bd) { bd = d; bi = j; } });
         sum[bi][0] += s[0]; sum[bi][1] += s[1]; sum[bi][2] += s[2]; sum[bi][3]++;
       }
-      // Drop colours under 5% of the inked area: specks, not inks.
-      centres = sum.filter((s) => s[3] >= samples.length * 0.05).map((s) => [s[0] / s[3], s[1] / s[3], s[2] / s[3]]);
+      // Drop colours under 5% of the inked area: specks, not inks. Except
+      // the darkest near-black one: a drawing's outline is often a small
+      // share of its ink but carries the whole drawing, and dropping it
+      // printed a black line in Sky blue (review, 2026-11-17).
+      const keep = sum.map((s) => s[3] >= samples.length * 0.05);
+      let darkest = -1, darkestL = Infinity;
+      sum.forEach((s, j) => {
+        if (s[3] >= Math.max(15, samples.length * 0.001) && s[0] / s[3] < darkestL) { darkestL = s[0] / s[3]; darkest = j; }
+      });
+      if (darkest >= 0 && darkestL < 35) keep[darkest] = true;
+      centres = sum.filter((_, j) => keep[j]).map((s) => [s[0] / s[3], s[1] / s[3], s[2] / s[3]]);
     }
   }
   if (!centres.length) centres = [toLab(35, 32, 31)];
@@ -107,19 +141,26 @@ export function screenPrint(clean: Raster, paper: readonly [number, number, numb
   // 2. Snap each colour to the nearest palette ink; merge any that collide,
   //    and any two that are near twins (Navy and Charcoal): one marker split
   //    across two dark inks reads as a speckled line, not as two inks.
-  const inkOf = centres.map((c) => {
-    let bi = 0, bd = Infinity;
-    INK_LAB.forEach((k, j) => { const d = labDist(c, k); if (d < bd) { bd = d; bi = j; } });
-    return bi;
-  });
-  for (let a = 0; a < inkOf.length; a++) {
-    for (let b = 0; b < a; b++) {
-      if (labDist(INK_LAB[inkOf[a]], INK_LAB[inkOf[b]]) < 25) inkOf[a] = inkOf[b];
+  let inkOf: number[];
+  let used: number[];
+  if (fixed) {
+    inkOf = fixed.inkOf;
+    used = fixed.used;
+  } else {
+    inkOf = centres.map((c) => {
+      let bi = 0, bd = Infinity;
+      INK_LAB.forEach((k, j) => { const d = labDist(c, k); if (d < bd) { bd = d; bi = j; } });
+      return bi;
+    });
+    for (let a = 0; a < inkOf.length; a++) {
+      for (let b = 0; b < a; b++) {
+        if (labDist(INK_LAB[inkOf[a]], INK_LAB[inkOf[b]]) < 25) inkOf[a] = inkOf[b];
+      }
     }
+    used = [...new Set(inkOf)];
+    // Lightest ink first, so darker inks overprint it like a real run.
+    used.sort((a, b) => INK_LAB[b][0] - INK_LAB[a][0]);
   }
-  const used = [...new Set(inkOf)];
-  // Lightest ink first, so darker inks overprint it like a real run.
-  used.sort((a, b) => INK_LAB[b][0] - INK_LAB[a][0]);
 
   // 3. Each pixel: how much ink (coverage) and which ink (nearest centre).
   //    Darkness is softened over a radius in proportion to the image first:
@@ -132,13 +173,20 @@ export function screenPrint(clean: Raster, paper: readonly [number, number, numb
   // Where ink starts, relative to this drawing's own strongest marks: bold
   // texta keeps a 0.20 cut, faint pencil (strongest marks near 0.45) gets
   // about 0.11, so its lightest lines are not dropped from the print.
-  const hist = new Uint32Array(101);
-  let inked = 0;
-  for (let i = 0; i < n; i++) if (soft[i] > 0.08) { hist[Math.min(100, Math.round(soft[i] * 100))]++; inked++; }
-  let ref = 1;
-  for (let t = 0, acc = 0; t <= 100 && inked; t++) { acc += hist[t]; if (acc >= inked * 0.9) { ref = t / 100; break; } }
-  const lo = Math.max(0.08, Math.min(0.2, 0.25 * ref));
-  const span = Math.max(0.06, Math.min(0.14, 0.15 * ref));
+  let lo: number;
+  let span: number;
+  if (fixed) {
+    lo = fixed.lo;
+    span = fixed.span;
+  } else {
+    const hist = new Uint32Array(101);
+    let inked = 0;
+    for (let i = 0; i < n; i++) if (soft[i] > 0.08) { hist[Math.min(100, Math.round(soft[i] * 100))]++; inked++; }
+    let ref = 1;
+    for (let t = 0, acc = 0; t <= 100 && inked; t++) { acc += hist[t]; if (acc >= inked * 0.9) { ref = t / 100; break; } }
+    lo = Math.max(0.08, Math.min(0.2, 0.25 * ref));
+    span = Math.max(0.06, Math.min(0.14, 0.15 * ref));
+  }
   const label = new Uint8Array(n);
   const cover = new Float32Array(n);
   for (let i = 0; i < n; i++) {
@@ -182,5 +230,5 @@ export function screenPrint(clean: Raster, paper: readonly [number, number, numb
       }
     }
   });
-  return { image: out, inks: used.map((i) => INKS[i].name) };
+  return { image: out, inks: used.map((i) => INKS[i].name), palette: { centres, inkOf, used, lo, span } };
 }

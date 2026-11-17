@@ -19,6 +19,14 @@ import { makePrintFile } from './printFile';
 
 const PRINT_BUCKET = 'print-files';
 
+/**
+ * Ordering is on only when the build says so (VITE_CHECKOUT_LIVE=true), once
+ * Stripe, Supabase and Gelato are set up (docs/PAYMENTS.md). Until then a
+ * preview says plainly that ordering is off, instead of failing on a network
+ * call and reading as broken.
+ */
+const CHECKOUT_LIVE = import.meta.env.VITE_CHECKOUT_LIVE === 'true';
+
 interface CreateOrderResponse {
   orderId: string;
   path: string;
@@ -53,6 +61,9 @@ async function call<T>(name: string, body: Record<string, unknown>, fallback: st
 }
 
 export async function startCheckout(selection: OrderSelection, onStep: (step: CheckoutStep) => void): Promise<void> {
+  if (!CHECKOUT_LIVE) {
+    throw new Error("This is a preview: ordering isn't switched on yet. Nothing has been ordered or charged.");
+  }
   onStep('order');
   const order = await call<CreateOrderResponse>(
     'create-order',
@@ -63,7 +74,7 @@ export async function startCheckout(selection: OrderSelection, onStep: (step: Ch
   onStep('print');
   let file: Blob;
   try {
-    file = await makePrintFile(selection.photo, selection.look, selection.product, order.print);
+    file = await makePrintFile(selection.photo, selection.look, selection.product, order.print, selection.decisions);
   } catch (e) {
     console.error('Print file failed:', e);
     throw new Error(
