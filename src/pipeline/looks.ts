@@ -58,6 +58,8 @@ export interface LooksResult {
    * or ink the table, so it is not offered.
    */
   screenPrintSuitable: boolean;
+  /** A whole sheet with table round it was seen (and, auto-crop being off, not cropped). */
+  tableSeen: boolean;
   /**
    * Share of the cleaned image's outer edge carrying colour when no sheet
    * was cropped: high means the table (or a hand, a bench) is probably in
@@ -158,6 +160,10 @@ export async function makeLooks(
   const d = asDrawn.data;
   for (let p = 0; p < d.length; p += 4) if (1 - Math.min(d[p], d[p + 1], d[p + 2]) / 255 > 0.15) inked++;
   const inkCoverage = inked / (asDrawn.width * asDrawn.height);
+  // A whole sheet was found with table round it. Not cropped (AUTO_CROP),
+  // so the sheet's own outline is in the picture: the table may clean away
+  // to white, but the edge of the paper still prints as a thin border.
+  const tableSeen = !fixed && paperReason === 'sheet found';
   let edgeInk = 0;
   if (!quad) {
     const W = asDrawn.width, H = asDrawn.height;
@@ -195,7 +201,8 @@ export async function makeLooks(
     // Also not when the table shows round the drawing: with no crop, the
     // screen print inks the table too, and a big grey counter swamped a
     // drawing's small red cheeks into Brown. A closer photo brings it back.
-    screenPrintSuitable: inkCoverage <= MAX_SCREEN_PRINT_COVERAGE && edgeInk <= 0.3,
+    screenPrintSuitable: inkCoverage <= MAX_SCREEN_PRINT_COVERAGE && edgeInk <= 0.3 && !tableSeen,
+    tableSeen,
     edgeInk,
     decisions: {
       quad: quad ? (quad.map((p) => ({ x: p.x / raw.width, y: p.y / raw.height })) as Quad) : null,

@@ -81,7 +81,11 @@ export const MakeFlow: React.FC<MakeFlowProps> = ({ initialFile, onOrder }) => {
     setScreenPrintOk(res.screenPrintSuitable);
     if (!res.screenPrintSuitable) setLook('as_drawn');
     setCloserTip(
-      res.paperReason === 'sheet is small in the photo' ? 'small' : !res.quad && res.edgeInk > 0.3 ? 'background' : null,
+      res.paperReason === 'sheet is small in the photo'
+        ? 'small'
+        : res.tableSeen || (!res.quad && res.edgeInk > 0.3)
+          ? 'background'
+          : null,
     );
     setStep('choose');
   };
