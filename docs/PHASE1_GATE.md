@@ -9,10 +9,16 @@ photos and his verdict on both looks.** Nothing commercial starts before that.
 Deterministic, in the browser, no network calls, no keys, no generative model. Nothing is
 redrawn: every mark keeps its shape and place.
 
-- **As drawn** (`cleanup.ts`): find the sheet and straighten it only when the finding is
-  unambiguous (otherwise leave it uncropped, so a crop can never cut the drawing); divide
-  out the light on the paper (shadow, fall-off, colour cast); stretch faint marks instead of
-  thresholding them; whiten table showing past the sheet, in the edge band only.
+- **As drawn** (`cleanup.ts`): divide out the light on the paper (shadow, fall-off, colour
+  cast), with paper recognised by its colour across the whole page so a big fill is never
+  mistaken for paper; stretch faint marks instead of thresholding them. Coloured paper keeps
+  its colour. **No automatic crop** (see below).
+- **Auto-crop is OFF** (`AUTO_CROP` in `looks.ts`). Two rounds of review built photos where it
+  cut the drawing (a close-up with a big fill kept 26%, brown ground on a wood table 17%).
+  A photo left uncropped shows the table in the preview and the flow asks for a closer photo;
+  nothing is lost. Turning it back on needs the parent to confirm the crop on screen.
+- The screen print is offered only when the paper fills the photo and is mostly paper; the
+  flow says why when it is withheld. Blank or too-dark photos are refused.
 - **Screen print** (`screenprint.ts`): the drawing's own colours, snapped to a fixed palette
   of 14 inks (1 to 3 per drawing), laid flat, slightly off register, with ink grain. Cream
   paper for framed prints; white available for mugs.

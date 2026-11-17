@@ -17,7 +17,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Check, Loader2, Upload } from 'lucide-react';
 import { measureSharpness } from '../utils/sharpness';
-import { LookDecisions, LookId, MIN_INK_COVERAGE, makeLooks, toCanvas } from '../pipeline/looks';
+import { LookDecisions, LookId, MIN_INK_COVERAGE, MIN_PHOTO_BRIGHTNESS, makeLooks, toCanvas } from '../pipeline/looks';
 import { ProductId, productMockup } from './mockups';
 import { PRODUCTS, formatAud } from './products';
 
@@ -55,6 +55,9 @@ export const MakeFlow: React.FC<MakeFlowProps> = ({ initialFile, onOrder }) => {
   const [decisions, setDecisions] = useState<LookDecisions | null>(null);
   // A gentle "take it closer" tip: the sheet is small, or table shows round it.
   const [closerTip, setCloserTip] = useState<'small' | 'background' | null>(null);
+  // The screen print floods coloured or dark paper with ink, so it is only
+  // offered when the page is mostly paper.
+  const [screenPrintOk, setScreenPrintOk] = useState(true);
   // A slow run on an earlier photo must not land on top of the current one.
   const run = useRef(0);
   // The photo as an object URL, not a data URL: a 12MP photo as base64 is a
@@ -67,7 +70,7 @@ export const MakeFlow: React.FC<MakeFlowProps> = ({ initialFile, onOrder }) => {
     if (id !== run.current) return;
     // A photo with no marks in it (a blank page, a photo of the table)
     // must not become an order for an empty print.
-    if (res.inkCoverage < MIN_INK_COVERAGE) {
+    if (res.inkCoverage < MIN_INK_COVERAGE || res.brightness < MIN_PHOTO_BRIGHTNESS) {
       setStep('empty');
       return;
     }
@@ -75,6 +78,8 @@ export const MakeFlow: React.FC<MakeFlowProps> = ({ initialFile, onOrder }) => {
     setLooks(canvases);
     setLookUrls(Object.fromEntries(Object.entries(canvases).map(([k, c]) => [k, c.toDataURL('image/jpeg', 0.88)])));
     setDecisions(res.decisions);
+    setScreenPrintOk(res.screenPrintSuitable);
+    if (!res.screenPrintSuitable) setLook('as_drawn');
     setCloserTip(
       res.paperReason === 'sheet is small in the photo' ? 'small' : !res.quad && res.edgeInk > 0.3 ? 'background' : null,
     );
@@ -90,6 +95,7 @@ export const MakeFlow: React.FC<MakeFlowProps> = ({ initialFile, onOrder }) => {
     setMockups({});
     setDecisions(null);
     setCloserTip(null);
+    setScreenPrintOk(true);
     setStep('working');
     try {
       if (photoUrl.current) URL.revokeObjectURL(photoUrl.current);
@@ -249,9 +255,13 @@ export const MakeFlow: React.FC<MakeFlowProps> = ({ initialFile, onOrder }) => {
             )}
             <section>
               <h2 className="font-serif text-2xl text-stone-900 mb-1">Pick a look</h2>
-              <p className="text-sm text-stone-600 mb-4">Same drawing, two ways. Nothing is redrawn.</p>
+              <p className="text-sm text-stone-600 mb-4">
+                {screenPrintOk
+                  ? 'Same drawing, two ways. Nothing is redrawn.'
+                  : 'Screen print needs white paper filling the photo, so for this one it is As drawn. Nothing is redrawn.'}
+              </p>
               <div className="grid grid-cols-2 gap-3">
-                {LOOKS.map((l) => (
+                {LOOKS.filter((l) => screenPrintOk || l.id !== 'screen_print').map((l) => (
                   <button
                     key={l.id}
                     data-testid={`look-${l.id}`}

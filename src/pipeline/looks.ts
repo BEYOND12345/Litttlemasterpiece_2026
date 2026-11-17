@@ -50,6 +50,14 @@ export interface LooksResult {
   edgeCleared: number;
   /** Share of the cleaned page carrying marks; near zero means no drawing was found. */
   inkCoverage: number;
+  /** Mean brightness of the photo (0-255); very low means too dark to print. */
+  brightness: number;
+  /**
+   * False when the page is mostly "ink" (coloured or dark paper, a full-page
+   * painting) or the table shows round it: the screen print would flood it
+   * or ink the table, so it is not offered.
+   */
+  screenPrintSuitable: boolean;
   /**
    * Share of the cleaned image's outer edge carrying colour when no sheet
    * was cropped: high means the table (or a hand, a bench) is probably in
@@ -62,6 +70,23 @@ export interface LooksResult {
 
 /** Below this share of the page in ink, there is no drawing to print. */
 export const MIN_INK_COVERAGE = 0.001;
+/** Above this share in ink, the page is coloured or dark paper: no screen print. */
+export const MAX_SCREEN_PRINT_COVERAGE = 0.6;
+/** Photos darker than this on average (0-255) are refused as too dark. */
+export const MIN_PHOTO_BRIGHTNESS = 30;
+
+/**
+ * AUTO-CROP IS OFF, deliberately (2026-11-17). Two rounds of review built
+ * photos where the automatic crop cut the drawing: a close-up with a big
+ * red fill kept 26% of it, brown ground drawn on a sheet on a wood table
+ * kept 17%, a black road on a grey counter 32%. Each fix exposed the next
+ * case. A crop the parent has not seen can cut their child's drawing; a
+ * photo left uncropped shows the table in the preview, the flow asks for a
+ * closer photo, and nothing is lost. findPaper still runs, only to tell the
+ * flow when the sheet is small. Turning this back on needs the parent to
+ * confirm the crop on screen, not a better guess.
+ */
+const AUTO_CROP = false;
 
 const yieldToBrowser = () => new Promise((r) => setTimeout(r, 0));
 
@@ -103,6 +128,9 @@ export async function makeLooks(
 ): Promise<LooksResult> {
   const t0 = performance.now();
   const raw = await decodeToRaster(src, opts.longEdge ?? PREVIEW_LONG_EDGE);
+  let lsum = 0;
+  for (let p = 0; p < raw.data.length; p += 16) lsum += 0.299 * raw.data[p] + 0.587 * raw.data[p + 1] + 0.114 * raw.data[p + 2];
+  const brightness = lsum / Math.ceil(raw.data.length / 16);
   const t1 = performance.now();
   await yieldToBrowser();
 
@@ -116,8 +144,8 @@ export async function makeLooks(
     paperReason = 'as previewed';
   } else {
     const paper = findPaper(raw);
-    quad = paper.quad;
-    mask = paper.mask;
+    quad = AUTO_CROP ? paper.quad : null;
+    mask = AUTO_CROP ? paper.mask : undefined;
     paperReason = paper.reason;
   }
   const page = quad ? straighten(raw, quad) : raw;
@@ -163,6 +191,11 @@ export async function makeLooks(
     gain,
     edgeCleared,
     inkCoverage,
+    brightness,
+    // Also not when the table shows round the drawing: with no crop, the
+    // screen print inks the table too, and a big grey counter swamped a
+    // drawing's small red cheeks into Brown. A closer photo brings it back.
+    screenPrintSuitable: inkCoverage <= MAX_SCREEN_PRINT_COVERAGE && edgeInk <= 0.3,
     edgeInk,
     decisions: {
       quad: quad ? (quad.map((p) => ({ x: p.x / raw.width, y: p.y / raw.height })) as Quad) : null,

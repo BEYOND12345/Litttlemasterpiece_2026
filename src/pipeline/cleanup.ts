@@ -446,6 +446,11 @@ function estimatePaperLight(src: Raster) {
   const refB = 1 - refR - refG;
   const paperColoured = refB <= refR + 0.04 && refG <= Math.max(refR, refB) + 0.04;
   if (!paperColoured) return whitePoint();
+  // Coloured paper (kraft, pink, blue) keeps its colour: dividing it to white
+  // turned a white crayon cloud on kraft into nothing (review, 2026-11-17).
+  // White paper under warm light measures about 0.034 from neutral; kraft
+  // about 0.077.
+  if (Math.hypot(refR - 1 / 3, refG - 1 / 3) > 0.05) return whitePoint();
 
   // 2 and 3. Candidates by colour, then paper by brightness against a coarse field.
   const cand = new Float32Array(n);
@@ -461,6 +466,18 @@ function estimatePaperLight(src: Raster) {
     if (cand[i] && L[i] >= 0.72 * coarse) { paper[i] = 1; paperCount++; }
   }
   if (paperCount < 0.12 * n) return whitePoint();
+  // The middle of the photo must be paper. With no crop, a neutral table
+  // round a coloured page can pass as "paper": the page was then corrected
+  // by the table's light, blue paper went pale cyan with halos, and a white
+  // crayon cloud on it disappeared (review, 2026-11-17).
+  let mid = 0, midPaper = 0;
+  for (let y = Math.floor(h * 0.25); y < Math.ceil(h * 0.75); y++) {
+    for (let x = Math.floor(w * 0.25); x < Math.ceil(w * 0.75); x++) {
+      mid++;
+      if (paper[y * w + x]) midPaper++;
+    }
+  }
+  if (midPaper < 0.3 * mid) return whitePoint();
 
   // 4. The light from paper alone; holes filled from the paper round them.
   const m1 = smooth(paper, w, h, 6);

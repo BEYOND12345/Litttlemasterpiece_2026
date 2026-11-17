@@ -83,6 +83,22 @@ export interface ScreenPrintResult {
   palette: ScreenPrintPalette;
 }
 
+/**
+ * Is a pale colour a different colour from an ink, rather than a lighter
+ * edge of it? By hue, not distance: a light blue edge of a blue stroke is
+ * far from blue in Lab but the same hue. Near-grey pale pixels never count
+ * (pencil, soft edges); a coloured pale beside a grey or black ink does
+ * (a pink fill inside a black outline).
+ */
+function distinctHue(pale: number[], ink: number[]): boolean {
+  const cp = Math.hypot(pale[1], pale[2]);
+  const ci = Math.hypot(ink[1], ink[2]);
+  if (cp < 12) return false;
+  if (ci < 12) return true;
+  const cos = (pale[1] * ink[1] + pale[2] * ink[2]) / (cp * ci);
+  return Math.acos(Math.max(-1, Math.min(1, cos))) > Math.PI / 6;
+}
+
 /** At most this many inks, as a real screen print would have. */
 const MAX_INKS = 4;
 
@@ -133,7 +149,60 @@ export function screenPrint(
         if (s[3] >= Math.max(15, samples.length * 0.001) && s[0] / s[3] < darkestL) { darkestL = s[0] / s[3]; darkest = j; }
       });
       if (darkest >= 0 && darkestL < 35) keep[darkest] = true;
-      centres = sum.filter((_, j) => keep[j]).map((s) => [s[0] / s[3], s[1] / s[3], s[2] / s[3]]);
+      // And a small but clearly distinct colour: red cheeks are a small share
+      // of a drawing's ink, and in an uncropped photo (the sheet's own edge
+      // inked too) they fell under 5% and printed Brown (review, 2026-11-17).
+      const mean = (g: number[]) => [g[0] / g[3], g[1] / g[3], g[2] / g[3]];
+      sum.forEach((g, j) => {
+        if (keep[j] || g[3] < samples.length * 0.01) return;
+        const c = mean(g);
+        if (Math.hypot(c[1], c[2]) < 25) return;
+        if (sum.every((o, k) => !keep[k] || distinctHue(c, mean(o)))) keep[j] = true;
+      });
+      centres = sum.filter((_, j) => keep[j]).map(mean);
+    }
+  }
+  // Pale colours of their own: a pink fill or a yellow sun is lighter than
+  // 0.45, so the clustering above never sees it, and it printed in the
+  // nearest dark ink (a pink fill as a solid Charcoal block; review,
+  // 2026-11-17). A pale pixel only founds a new ink when it is FAR from
+  // every existing colour: the soft light edge of a navy stroke is close to
+  // navy and must not become an ink of its own (sampling everything over
+  // 0.2 did exactly that, edging strokes in Teal and dropping a red).
+  if (!fixed && centres.length && centres.length < MAX_INKS) {
+    const stride = Math.max(1, Math.floor(n / 60000));
+    const pale: number[][] = [];
+    let paleAll = 0;
+    for (let i = 0; i < n; i += stride) {
+      const p = i * 4;
+      const d = darkness(data, p);
+      if (d <= 0.2 || d > 0.45) continue;
+      paleAll++;
+      const lab = toLab(data[p], data[p + 1], data[p + 2]);
+      if (centres.every((c) => distinctHue(lab, c))) pale.push(lab);
+    }
+    if (pale.length >= Math.max(20, 0.03 * (samples.length + paleAll))) {
+      const extra: number[][] = [pale.reduce((a, b) => (b[0] < a[0] ? b : a))];
+      while (centres.length + extra.length < MAX_INKS) {
+        let far = pale[0], fd = -1;
+        for (const q of pale) {
+          const d = Math.min(...extra.map((c) => labDist(q, c)));
+          if (d > fd) { fd = d; far = q; }
+        }
+        if (fd < 18) break;
+        extra.push(far);
+      }
+      let groups = extra;
+      for (let iter = 0; iter < 6; iter++) {
+        const sum = groups.map(() => [0, 0, 0, 0]);
+        for (const q of pale) {
+          let bi = 0, bd = Infinity;
+          groups.forEach((c, j) => { const d = labDist(q, c); if (d < bd) { bd = d; bi = j; } });
+          sum[bi][0] += q[0]; sum[bi][1] += q[1]; sum[bi][2] += q[2]; sum[bi][3]++;
+        }
+        groups = sum.filter((g) => g[3] >= pale.length * 0.2).map((g) => [g[0] / g[3], g[1] / g[3], g[2] / g[3]]);
+      }
+      centres = centres.concat(groups);
     }
   }
   if (!centres.length) centres = [toLab(35, 32, 31)];
