@@ -809,9 +809,6 @@ export const SimplifiedStudio: React.FC<SimplifiedStudioProps> = ({
   if ((status === ProcessingStatus.IDLE && !existingArtwork) || uploadedButNotStarted) {
     const inspirationImages = [
       { src: '/large framed rainbow.png', title: 'Framed Wall Art' },
-      { src: '/Cup indoors.png', title: 'Coffee Mug' },
-      { src: '/TokeBag Indoor.png', title: 'Tote Bag' },
-      { src: '/Phone.png', title: 'Phone Case' },
     ];
 
     return (

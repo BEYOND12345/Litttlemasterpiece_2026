@@ -1,97 +1,58 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { AppView, User } from '../types/types';
-import { signOut } from '../services/authService';
 import { APP_NAME } from '../constants/constants';
-import { LogOut } from 'lucide-react';
-import { CartButton } from './CartButton';
-import { CartSidebar } from './CartSidebar';
+import { BUSINESS } from './legal/business';
+import { ToConfirm } from './legal/LegalKit';
 
 interface LayoutProps {
   currentView: AppView;
   onNavigate: (view: AppView) => void;
-  currentUser: User | null;
+  /**
+   * Still passed by App, unused: there are no accounts at launch, so the header
+   * has no Sign In, no signed-in menu and no cart. Ordering is a guest checkout
+   * from inside the flow.
+   */
+  currentUser?: User | null;
   children: React.ReactNode;
 }
 
-export const Layout: React.FC<LayoutProps> = ({ onNavigate, currentUser, children }) => {
-  const [isCartOpen, setIsCartOpen] = useState(false);
+// Every link is at least 44px tall, so it can be hit with a thumb.
+const footerLink =
+  'inline-flex items-center min-h-[44px] min-w-[44px] text-left hover:text-white transition-colors';
 
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-      onNavigate(AppView.HOME);
-    } catch (error) {
-      console.error('Sign out error:', error);
-    }
-  };
-
-  const handleCheckout = () => {
-    setIsCartOpen(false);
-    onNavigate(AppView.CHECKOUT);
-  };
+export const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, children }) => {
+  const footerLinks: { label: string; view: AppView }[] = [
+    { label: 'Shipping & Returns', view: AppView.SHIPPING },
+    { label: 'Contact', view: AppView.CONTACT },
+    { label: 'Privacy', view: AppView.PRIVACY },
+    { label: 'Terms', view: AppView.TERMS },
+  ];
 
   return (
     <div className="min-h-screen bg-stone-50">
       <header className="bg-white border-b border-stone-100 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-20">
+          <div className="flex justify-between items-center gap-3 h-16 sm:h-20">
             <button
               onClick={() => onNavigate(AppView.HOME)}
-              className="font-serif text-2xl text-stone-900 hover:text-terracotta transition-colors"
+              className="min-h-[44px] whitespace-nowrap font-serif text-xl sm:text-2xl text-stone-900 hover:text-terracotta transition-colors"
             >
               {APP_NAME}
             </button>
 
-            <nav className="flex items-center gap-6">
-              <CartButton onClick={() => setIsCartOpen(true)} />
-              {currentUser ? (
-                <>
-                  <button
-                    onClick={() => onNavigate(AppView.DASHBOARD)}
-                    className="text-sm font-medium text-stone-600 hover:text-stone-900 transition-colors"
-                  >
-                    My Collection
-                  </button>
-                  <button
-                    onClick={() => onNavigate(AppView.STUDIO)}
-                    className="text-sm font-medium text-stone-600 hover:text-stone-900 transition-colors"
-                  >
-                    Create
-                  </button>
-                  <button
-                    onClick={handleSignOut}
-                    className="flex items-center gap-2 text-sm font-medium text-stone-600 hover:text-stone-900 transition-colors"
-                  >
-                    <LogOut size={16} />
-                    Sign Out
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    onClick={() => onNavigate(AppView.STUDIO)}
-                    className="text-sm font-medium text-stone-600 hover:text-stone-900 transition-colors"
-                  >
-                    Get Started
-                  </button>
-                  <button
-                    onClick={() => onNavigate(AppView.AUTH)}
-                    className="text-sm font-medium bg-stone-900 text-white px-4 py-2 hover:bg-stone-800 transition-colors"
-                  >
-                    Sign In
-                  </button>
-                </>
-              )}
-            </nav>
+            {/* The same action as the landing page's Start button: open the
+                flow. Hidden inside the flow, where it would do nothing. */}
+            {currentView !== AppView.STUDIO && (
+              <button
+                onClick={() => onNavigate(AppView.STUDIO)}
+                className="min-h-[44px] whitespace-nowrap px-4 text-sm font-medium bg-stone-900 text-white hover:bg-stone-800 transition-colors"
+              >
+                Get Started
+              </button>
+            )}
           </div>
         </div>
       </header>
-
-      <CartSidebar
-        isOpen={isCartOpen}
-        onClose={() => setIsCartOpen(false)}
-        onCheckout={handleCheckout}
-      />
 
       <main>{children}</main>
 
@@ -100,72 +61,36 @@ export const Layout: React.FC<LayoutProps> = ({ onNavigate, currentUser, childre
           <div className="grid md:grid-cols-3 gap-8 mb-8">
             <div>
               <p className="font-serif text-2xl text-white mb-3">{APP_NAME}</p>
-              <p className="text-sm font-light">Preserving childhood creativity with care and craft.</p>
+              <p className="text-sm font-light">Framed prints and mugs made from your child's drawing.</p>
+              <button onClick={() => onNavigate(AppView.STUDIO)} className={`${footerLink} text-sm text-white underline underline-offset-4 mt-2`}>
+                Get Started
+              </button>
             </div>
 
-            <div>
-              <h3 className="text-white font-bold text-sm uppercase tracking-widest mb-4">Explore</h3>
-              <ul className="space-y-2 text-sm">
-                <li>
-                  <button
-                    onClick={() => onNavigate(AppView.ABOUT)}
-                    className="hover:text-white transition-colors"
-                  >
-                    About Us
-                  </button>
-                </li>
-                <li>
-                  <button
-                    onClick={() => onNavigate(AppView.BLOG)}
-                    className="hover:text-white transition-colors"
-                  >
-                    Blog & Tips
-                  </button>
-                </li>
-                <li>
-                  <button
-                    onClick={() => onNavigate(AppView.STUDIO)}
-                    className="hover:text-white transition-colors"
-                  >
-                    Get Started
-                  </button>
-                </li>
+            <nav aria-label="Help and legal" className="md:col-span-2">
+              <h3 className="text-white font-bold text-sm uppercase tracking-widest mb-2">Help</h3>
+              <ul className="grid grid-cols-2 gap-x-6 text-sm">
+                {footerLinks.map((link) => (
+                  <li key={link.view}>
+                    <button onClick={() => onNavigate(link.view)} className={footerLink}>
+                      {link.label}
+                    </button>
+                  </li>
+                ))}
               </ul>
-            </div>
-
-            <div>
-              <h3 className="text-white font-bold text-sm uppercase tracking-widest mb-4">Resources</h3>
-              <ul className="space-y-2 text-sm">
-                <li>
-                  <button
-                    onClick={() => onNavigate(AppView.BLOG)}
-                    className="hover:text-white transition-colors"
-                  >
-                    Photography Tips
-                  </button>
-                </li>
-                <li>
-                  <button
-                    onClick={() => onNavigate(AppView.BLOG)}
-                    className="hover:text-white transition-colors"
-                  >
-                    Style Guide
-                  </button>
-                </li>
-                <li>
-                  <button
-                    onClick={() => onNavigate(AppView.BLOG)}
-                    className="hover:text-white transition-colors"
-                  >
-                    Display Ideas
-                  </button>
-                </li>
-              </ul>
-            </div>
+            </nav>
           </div>
 
-          <div className="border-t border-stone-800 pt-8 text-center">
-            <p className="text-xs">&copy; {new Date().getFullYear()} {APP_NAME}. All rights reserved.</p>
+          <div className="border-t border-stone-800 pt-8 text-xs leading-relaxed space-y-2">
+            <p>
+              {BUSINESS.tradingName} is run by {BUSINESS.legalName}, ABN {BUSINESS.abn}, {BUSINESS.location}.{' '}
+              <ToConfirm>
+                this ABN was taken from the owner's other business's website. Check on the ABN Lookup that it is{' '}
+                {BUSINESS.legalName}'s
+              </ToConfirm>
+            </p>
+            <p>Printed by Gelato. Payments by Stripe. Prices in AUD, including GST.</p>
+            <p>&copy; {new Date().getFullYear()} {BUSINESS.legalName}. All rights reserved.</p>
           </div>
         </div>
       </footer>

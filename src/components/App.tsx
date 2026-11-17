@@ -11,6 +11,10 @@ import { BlogPage } from './BlogPage';
 import { CheckoutPage } from './CheckoutPage';
 import { MockupTemplateManager } from './MockupTemplateManager';
 import { MockupDiagnostic } from './MockupDiagnostic';
+import { PrivacyPage } from './legal/PrivacyPage';
+import { TermsPage } from './legal/TermsPage';
+import { ShippingReturnsPage } from './legal/ShippingReturnsPage';
+import { ContactPage } from './legal/ContactPage';
 import { MakeFlow, OrderSelection } from '../flow/MakeFlow';
 import { PRODUCTS } from '../flow/products';
 import { AppView, Artwork, User } from '../types/types';
@@ -169,6 +173,18 @@ const App: React.FC = () => {
 
       case AppView.DIAGNOSTIC:
         return <MockupDiagnostic />;
+
+      case AppView.PRIVACY:
+        return <PrivacyPage />;
+
+      case AppView.TERMS:
+        return <TermsPage onNavigate={handleNavigate} />;
+
+      case AppView.SHIPPING:
+        return <ShippingReturnsPage onNavigate={handleNavigate} />;
+
+      case AppView.CONTACT:
+        return <ContactPage onNavigate={handleNavigate} />;
 
       default:
         return <LandingPage onStart={() => handleStartCreating()} />;

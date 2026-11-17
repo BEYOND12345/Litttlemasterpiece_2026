@@ -1,3 +1,4 @@
+// Not linked from navigation for launch: the posts are off-message for what is being sold. Kept for later.
 import React, { useState } from 'react';
 import { Clock, ArrowRight } from 'lucide-react';
 
@@ -145,7 +146,7 @@ Mix framed prints with:
 
 Remember: Your gallery wall can evolve! Rotate artwork seasonally or as your child creates new favourites.
     `,
-    imageUrl: '/Large print above fire place.png',
+    imageUrl: '/large framed rainbow.png',
     readTime: 7,
     publishedAt: '2024-01-05',
     category: 'Display Ideas'

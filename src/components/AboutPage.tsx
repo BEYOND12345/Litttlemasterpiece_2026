@@ -1,3 +1,4 @@
+// Not linked from navigation for launch: its claims and numbers are unverified and its button goes nowhere. Kept for later.
 import React from 'react';
 import { Heart, Sparkles, Users, Shield } from 'lucide-react';
 
@@ -13,14 +14,6 @@ export const AboutPage: React.FC = () => {
           <p className="text-xl text-stone-600 font-light leading-relaxed max-w-2xl mx-auto">
             We believe that children's art is more than scribbles on paper. It's imagination made visible, creativity in its purest form, and memories worth preserving.
           </p>
-        </div>
-
-        <div className="bg-white border border-stone-200 shadow-sm mb-16">
-          <img
-            src="/Bedroom .png"
-            alt="Child's artwork displayed in bedroom"
-            className="w-full h-96 object-cover"
-          />
         </div>
 
         <div className="prose prose-stone max-w-none mb-20">

@@ -11,6 +11,10 @@ export enum AppView {
   BLOG = 'BLOG',
   ADMIN = 'ADMIN',
   DIAGNOSTIC = 'DIAGNOSTIC',
+  PRIVACY = 'PRIVACY',
+  TERMS = 'TERMS',
+  SHIPPING = 'SHIPPING',
+  CONTACT = 'CONTACT',
 }
 
 export enum ProcessingStatus {

@@ -25,16 +25,6 @@ const MOCKUP_MAPPINGS: MockupImageMapping[] = [
     },
   },
   {
-    localPath: '/Cup indoors.png',
-    productType: 'mug',
-    name: 'Ceramic Mug on Table',
-    placementConfig: {
-      width: '30%',
-      height: '35%',
-      gravity: 'center',
-    },
-  },
-  {
     localPath: '/dragon tote 1.png',
     productType: 'tote',
     name: 'Tote Bag Display',
@@ -51,16 +41,6 @@ const MOCKUP_MAPPINGS: MockupImageMapping[] = [
     placementConfig: {
       width: '25%',
       height: '30%',
-      gravity: 'center',
-    },
-  },
-  {
-    localPath: '/Phone.png',
-    productType: 'phone',
-    name: 'Phone Case on Desk',
-    placementConfig: {
-      width: '18%',
-      height: '40%',
       gravity: 'center',
     },
   },

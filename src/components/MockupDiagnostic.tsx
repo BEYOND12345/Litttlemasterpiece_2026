@@ -170,7 +170,7 @@ export function MockupDiagnostic() {
                     )}
                   </div>
                   <p className="text-xs text-gray-500 mt-2">
-                    Try using: large framed rainbow.png, Cup indoors.png, dragon tote 1.png, or Phone.png from your public folder
+                    Try using: large framed rainbow.png or dragon tote 1.png from your public folder
                   </p>
                 </div>
               </div>
@@ -190,7 +190,7 @@ export function MockupDiagnostic() {
         <h2 className="font-bold text-blue-900 mb-3">How to Fix Missing Templates:</h2>
         <ol className="list-decimal list-inside space-y-2 text-sm text-blue-800">
           <li>Use the file upload buttons above to upload mockup images from your computer</li>
-          <li>Choose images from your /public folder like "large framed rainbow.png", "Cup indoors.png", etc.</li>
+          <li>Choose images from your /public folder like "large framed rainbow.png"</li>
           <li>The images will be uploaded to Cloudinary and the database will be updated automatically</li>
           <li>Refresh this page to see the updated status</li>
         </ol>
