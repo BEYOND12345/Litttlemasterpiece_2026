@@ -16,7 +16,7 @@ import { TermsPage } from './legal/TermsPage';
 import { ShippingReturnsPage } from './legal/ShippingReturnsPage';
 import { ContactPage } from './legal/ContactPage';
 import { MakeFlow, OrderSelection } from '../flow/MakeFlow';
-import { startCheckout } from '../flow/checkout';
+import { CheckoutDisabledError, startCheckout } from '../flow/checkout';
 import { CheckoutStep, readCheckoutReturn } from '../flow/checkoutLogic';
 import { CheckoutProgress } from '../flow/CheckoutProgress';
 import { OrderConfirmed } from '../flow/OrderConfirmed';
@@ -70,7 +70,13 @@ const App: React.FC = () => {
   const [completedOrderId, setCompletedOrderId] = useState<string | null>(null);
   // Set while a parent's Order is on its way to Stripe (src/flow/checkout.ts):
   // which step it is on, or what went wrong.
-  const [checkout, setCheckout] = useState<{ selection: OrderSelection; step: CheckoutStep; error: string | null } | null>(null);
+  const [checkout, setCheckout] = useState<{
+    selection: OrderSelection;
+    step: CheckoutStep;
+    error: string | null;
+    /** Ordering is switched off in this build: a calm notice, not a failure. */
+    previewOnly?: boolean;
+  } | null>(null);
   // Stripe's redirect back: ?session_id=cs_... after paying, ?checkout=cancelled if not.
   const [checkoutReturn, setCheckoutReturn] = useState(() => readCheckoutReturn(window.location.search));
   const checkoutRef = useRef(checkout);
@@ -84,7 +90,8 @@ const App: React.FC = () => {
     } catch (e) {
       console.error('Checkout failed:', e);
       const error = e instanceof Error ? e.message : 'Something went wrong. Nothing has been charged.';
-      setCheckout((c) => (c ? { ...c, error } : c));
+      const previewOnly = e instanceof CheckoutDisabledError;
+      setCheckout((c) => (c ? { ...c, error, previewOnly } : c));
     }
   };
 
@@ -227,6 +234,7 @@ const App: React.FC = () => {
           <CheckoutProgress
             step={checkout.step}
             error={checkout.error}
+            previewOnly={checkout.previewOnly}
             onRetry={() => runCheckout(checkout.selection)}
             onBack={() => setCheckout(null)}
           />

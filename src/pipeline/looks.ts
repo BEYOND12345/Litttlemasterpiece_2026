@@ -50,6 +50,12 @@ export interface LooksResult {
   edgeCleared: number;
   /** Share of the cleaned page carrying marks; near zero means no drawing was found. */
   inkCoverage: number;
+  /**
+   * Share of the cleaned image's outer edge carrying colour when no sheet
+   * was cropped: high means the table (or a hand, a bench) is probably in
+   * the picture. The flow suggests a closer photo; it never crops on this.
+   */
+  edgeInk: number;
   decisions: LookDecisions;
   ms: { decode: number; paper: number; flatten: number; screenPrint: number; total: number };
 }
@@ -124,6 +130,22 @@ export async function makeLooks(
   const d = asDrawn.data;
   for (let p = 0; p < d.length; p += 4) if (1 - Math.min(d[p], d[p + 1], d[p + 2]) / 255 > 0.15) inked++;
   const inkCoverage = inked / (asDrawn.width * asDrawn.height);
+  let edgeInk = 0;
+  if (!quad) {
+    const W = asDrawn.width, H = asDrawn.height;
+    const band = Math.max(2, Math.round(Math.min(W, H) * 0.03));
+    let edge = 0, edgeInked = 0;
+    for (let y = 0; y < H; y++) {
+      const inY = y < band || y >= H - band;
+      for (let x = 0; x < W; x++) {
+        if (!inY && x >= band && x < W - band) continue;
+        edge++;
+        const p = (y * W + x) * 4;
+        if (1 - Math.min(d[p], d[p + 1], d[p + 2]) / 255 > 0.15) edgeInked++;
+      }
+    }
+    edgeInk = edgeInked / edge;
+  }
   const t3 = performance.now();
   await yieldToBrowser();
 
@@ -141,6 +163,7 @@ export async function makeLooks(
     gain,
     edgeCleared,
     inkCoverage,
+    edgeInk,
     decisions: {
       quad: quad ? (quad.map((p) => ({ x: p.x / raw.width, y: p.y / raw.height })) as Quad) : null,
       mask: mask ? { data: mask.data, width: mask.width, height: mask.height } : null,

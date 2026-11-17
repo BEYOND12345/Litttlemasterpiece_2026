@@ -27,6 +27,9 @@ const PRINT_BUCKET = 'print-files';
  */
 const CHECKOUT_LIVE = import.meta.env.VITE_CHECKOUT_LIVE === 'true';
 
+/** Thrown when ordering is switched off, so the page can say so calmly instead of as a failure. */
+export class CheckoutDisabledError extends Error {}
+
 interface CreateOrderResponse {
   orderId: string;
   path: string;
@@ -62,7 +65,9 @@ async function call<T>(name: string, body: Record<string, unknown>, fallback: st
 
 export async function startCheckout(selection: OrderSelection, onStep: (step: CheckoutStep) => void): Promise<void> {
   if (!CHECKOUT_LIVE) {
-    throw new Error("This is a preview: ordering isn't switched on yet. Nothing has been ordered or charged.");
+    throw new CheckoutDisabledError(
+      "This is a preview, so ordering isn't switched on yet. Nothing has been ordered or charged.",
+    );
   }
   onStep('order');
   const order = await call<CreateOrderResponse>(

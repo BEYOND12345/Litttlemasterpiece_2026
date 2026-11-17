@@ -53,7 +53,8 @@ export const MakeFlow: React.FC<MakeFlowProps> = ({ initialFile, onOrder }) => {
   const [product, setProduct] = useState<ProductId | null>(null);
   const [mockups, setMockups] = useState<Record<string, string>>({});
   const [decisions, setDecisions] = useState<LookDecisions | null>(null);
-  const [smallSheet, setSmallSheet] = useState(false);
+  // A gentle "take it closer" tip: the sheet is small, or table shows round it.
+  const [closerTip, setCloserTip] = useState<'small' | 'background' | null>(null);
   // A slow run on an earlier photo must not land on top of the current one.
   const run = useRef(0);
   // The photo as an object URL, not a data URL: a 12MP photo as base64 is a
@@ -74,7 +75,9 @@ export const MakeFlow: React.FC<MakeFlowProps> = ({ initialFile, onOrder }) => {
     setLooks(canvases);
     setLookUrls(Object.fromEntries(Object.entries(canvases).map(([k, c]) => [k, c.toDataURL('image/jpeg', 0.88)])));
     setDecisions(res.decisions);
-    setSmallSheet(res.paperReason === 'sheet is small in the photo');
+    setCloserTip(
+      res.paperReason === 'sheet is small in the photo' ? 'small' : !res.quad && res.edgeInk > 0.3 ? 'background' : null,
+    );
     setStep('choose');
   };
 
@@ -86,7 +89,7 @@ export const MakeFlow: React.FC<MakeFlowProps> = ({ initialFile, onOrder }) => {
     setProduct(null);
     setMockups({});
     setDecisions(null);
-    setSmallSheet(false);
+    setCloserTip(null);
     setStep('working');
     try {
       if (photoUrl.current) URL.revokeObjectURL(photoUrl.current);
@@ -232,9 +235,13 @@ export const MakeFlow: React.FC<MakeFlowProps> = ({ initialFile, onOrder }) => {
 
         {step === 'choose' && looks && (
           <div className="space-y-10">
-            {smallSheet && (
+            {closerTip && (
               <div data-testid="flow-small-sheet" className="border border-stone-200 bg-white rounded-lg p-4 text-sm text-stone-700 flex items-start justify-between gap-3">
-                <span>The drawing looks small in this photo. For the sharpest print, take it closer so the paper fills the frame.</span>
+                <span>
+                  {closerTip === 'small'
+                    ? 'The drawing looks small in this photo. For the sharpest print, take it closer so the paper fills the frame.'
+                    : 'Is the table showing around the drawing? For the cleanest print, take the photo closer so the paper fills the frame.'}
+                </span>
                 <button onClick={chooseAgain} className="shrink-0 min-h-[44px] px-3 text-terracotta font-medium underline">
                   Retake
                 </button>

@@ -18,11 +18,13 @@ import { CHECKOUT_STEPS, type CheckoutStep } from './checkoutLogic';
 interface CheckoutProgressProps {
   step: CheckoutStep;
   error: string | null;
+  /** Ordering is switched off in this build: say so calmly, with no Try again. */
+  previewOnly?: boolean;
   onRetry: () => void;
   onBack: () => void;
 }
 
-export const CheckoutProgress: React.FC<CheckoutProgressProps> = ({ step, error, onRetry, onBack }) => {
+export const CheckoutProgress: React.FC<CheckoutProgressProps> = ({ step, error, previewOnly, onRetry, onBack }) => {
   const current = CHECKOUT_STEPS.findIndex((s) => s.id === step);
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -72,7 +74,21 @@ export const CheckoutProgress: React.FC<CheckoutProgressProps> = ({ step, error,
         className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 outline-none"
         data-testid="checkout-progress"
       >
-        {error ? (
+        {error && previewOnly ? (
+          <>
+            <div role="status" className="mb-5">
+              <h2 id={titleId} className="font-serif text-2xl text-stone-900">Ordering opens soon</h2>
+              <p className="text-stone-600 mt-2" data-testid="checkout-error">{error}</p>
+            </div>
+            <button
+              ref={retryRef}
+              onClick={onBack}
+              className="w-full min-h-[48px] px-6 py-3 bg-terracotta text-white rounded-lg font-medium"
+            >
+              Back to my choices
+            </button>
+          </>
+        ) : error ? (
           <>
             <div role="alert" className="flex items-start gap-3 mb-4">
               <AlertCircle className="text-terracotta shrink-0 mt-1" size={22} aria-hidden="true" />
