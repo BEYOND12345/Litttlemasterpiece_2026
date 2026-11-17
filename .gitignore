@@ -24,3 +24,6 @@ dist-ssr
 
 # Python bytecode from scripts/
 __pycache__/
+
+# Agent worktrees (Claude Code): separate checkouts, never part of the repo
+.claude/worktrees/
