@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Layout } from './Layout';
 import { LandingPage } from './LandingPage';
 import { SimplifiedStudio } from './SimplifiedStudio';
@@ -23,8 +23,47 @@ import { OrderConfirmed } from '../flow/OrderConfirmed';
 import { AppView, Artwork, User } from '../types/types';
 import { getCurrentUser, onAuthStateChange } from '../services/authService';
 
+/**
+ * Navigation is view state, not a router, so each view change gets its own
+ * history entry ({ view, y }) and Back walks them instead of leaving the site.
+ */
+type HistoryEntry = { view: AppView; y?: number };
+
+function entryFrom(state: unknown): HistoryEntry | null {
+  const view = (state as { view?: unknown } | null)?.view;
+  if (typeof view !== 'string' || !(Object.values(AppView) as string[]).includes(view)) return null;
+  const y = (state as { y?: unknown }).y;
+  return { view: view as AppView, y: typeof y === 'number' ? y : undefined };
+}
+
+/**
+ * Views a reload may come back to. The rest need an artwork or a user that
+ * only lived in memory, so a reload on one of them starts at the landing page.
+ */
+const RELOADABLE = new Set<AppView>([
+  AppView.HOME,
+  AppView.STUDIO,
+  AppView.ABOUT,
+  AppView.BLOG,
+  AppView.PRIVACY,
+  AppView.TERMS,
+  AppView.SHIPPING,
+  AppView.CONTACT,
+]);
+
+/** A reload keeps the entry's state: come back to its view and place, if it can be shown. */
+function reloadedEntry(): HistoryEntry | null {
+  const entry = entryFrom(window.history.state);
+  return entry && RELOADABLE.has(entry.view) ? entry : null;
+}
+
 const App: React.FC = () => {
-  const [currentView, setCurrentView] = useState<AppView>(AppView.HOME);
+  const [currentView, setCurrentView] = useState<AppView>(() => reloadedEntry()?.view ?? AppView.HOME);
+  // The view as of the latest navigation, for the popstate listener and for
+  // calls that arrive between a navigation and its render.
+  const viewRef = useRef(currentView);
+  // Where to scroll once a view brought back by Back, Forward or a reload has rendered.
+  const pendingScroll = useRef<number | null>(reloadedEntry()?.y ?? null);
   const [activeArtwork, setActiveArtwork] = useState<Artwork | null>(null);
   const [initialFile, setInitialFile] = useState<File | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -34,6 +73,8 @@ const App: React.FC = () => {
   const [checkout, setCheckout] = useState<{ selection: OrderSelection; step: CheckoutStep; error: string | null } | null>(null);
   // Stripe's redirect back: ?session_id=cs_... after paying, ?checkout=cancelled if not.
   const [checkoutReturn, setCheckoutReturn] = useState(() => readCheckoutReturn(window.location.search));
+  const checkoutRef = useRef(checkout);
+  checkoutRef.current = checkout;
 
   const runCheckout = async (selection: OrderSelection) => {
     setCheckout({ selection, step: 'order', error: null });
@@ -48,8 +89,77 @@ const App: React.FC = () => {
   };
 
   const clearCheckoutReturn = () => {
-    window.history.replaceState(null, '', window.location.pathname);
+    // Keep this entry's { view } so Back still knows where it is.
+    window.history.replaceState(window.history.state, '', window.location.pathname);
     setCheckoutReturn(null);
+  };
+
+  useEffect(() => {
+    // The page puts scroll back itself (below): the browser would restore it
+    // before React has swapped the view, against the page being left.
+    if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual';
+    // The entry the parent arrived on. The URL is left exactly as it is, so a
+    // return from Stripe (?session_id=, ?checkout=cancelled) still reads.
+    window.history.replaceState({ view: viewRef.current, y: reloadedEntry()?.y }, '');
+
+    const onPopState = (e: PopStateEvent) => {
+      const entry = entryFrom(e.state);
+      // An entry this app did not make (a #fragment): leave the view alone.
+      if (!entry) return;
+      const c = checkoutRef.current;
+      if (c && !c.error) {
+        // An order is on its way to Stripe and will open it whatever this page
+        // shows, so Back holds here, on the overlay that says what is happening.
+        window.history.pushState({ view: viewRef.current }, '');
+        return;
+      }
+      // A failed checkout is over; it must not be waiting when the flow reopens.
+      if (c) setCheckout(null);
+      if (entry.view === viewRef.current) {
+        window.scrollTo(0, entry.y ?? 0);
+        return;
+      }
+      viewRef.current = entry.view;
+      pendingScroll.current = entry.y ?? 0;
+      setCurrentView(entry.view);
+    };
+
+    // Back from Stripe's page can restore this one from the back/forward cache
+    // exactly as it was left: overlay up, on its last step, going nowhere.
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted && checkoutRef.current) setCheckout(null);
+    };
+
+    window.addEventListener('popstate', onPopState);
+    window.addEventListener('pageshow', onPageShow);
+    return () => {
+      window.removeEventListener('popstate', onPopState);
+      window.removeEventListener('pageshow', onPageShow);
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    if (pendingScroll.current === null) return;
+    window.scrollTo(0, pendingScroll.current);
+    pendingScroll.current = null;
+  }, [currentView]);
+
+  /**
+   * Show a view. 'push' is a navigation the parent made, so Back returns
+   * from it; 'replace' corrects the current entry without adding one.
+   */
+  const showView = (view: AppView, how: 'push' | 'replace') => {
+    if (how === 'replace') {
+      window.history.replaceState({ view }, '');
+    } else if (view !== viewRef.current) {
+      // Remember where the parent was on the page being left.
+      window.history.replaceState({ view: viewRef.current, y: window.scrollY }, '');
+      window.history.pushState({ view }, '');
+    }
+    viewRef.current = view;
+    pendingScroll.current = null;
+    setCurrentView(view);
+    window.scrollTo(0, 0);
   };
 
   useEffect(() => {
@@ -76,13 +186,11 @@ const App: React.FC = () => {
 
     if (requiresAuth.includes(view) && !currentUser) {
       console.warn('⚠️ Auth required for', view, '- redirecting to auth page');
-      setCurrentView(AppView.AUTH);
-      window.scrollTo(0, 0);
+      showView(AppView.AUTH, 'push');
       return;
     }
 
-    setCurrentView(view);
-    window.scrollTo(0, 0);
+    showView(view, 'push');
   };
 
   const handleStartCreating = (file?: File) => {
@@ -125,8 +233,10 @@ const App: React.FC = () => {
         );
 
       case AppView.ENHANCEMENT:
+        // Nothing to show (e.g. Back to an entry from before a reload): this
+        // entry becomes the landing page rather than adding one.
         if (!activeArtwork) {
-          handleNavigate(AppView.HOME);
+          showView(AppView.HOME, 'replace');
           return null;
         }
         return (
@@ -142,7 +252,7 @@ const App: React.FC = () => {
 
       case AppView.MOCKUP_GALLERY:
         if (!activeArtwork) {
-          handleNavigate(AppView.HOME);
+          showView(AppView.HOME, 'replace');
           return null;
         }
         return <MockupGallery artwork={activeArtwork} onBack={() => handleNavigate(AppView.HOME)} />;
