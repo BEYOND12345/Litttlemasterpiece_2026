@@ -9,13 +9,15 @@
  * are deliberately a clean product shot rather than a lifestyle photo.
  */
 
+import { type Size, aSeriesSheet, divideOutPaper, placeArt } from './printGeometry';
+
 export type ProductId = 'framed' | 'mug';
 
 /** Background of every preview, so the two products read as a set. */
 const WALL = '#EFEAE2';
 
 /** Paper colours used by the two looks (must match src/pipeline/screenprint.ts PAPER). */
-const CREAM = [246, 241, 231];
+const CREAM = [246, 241, 231] as const;
 
 function canvas(w: number, h: number) {
   const c = document.createElement('canvas');
@@ -31,21 +33,26 @@ function contain(aw: number, ah: number, bw: number, bh: number) {
 }
 
 /**
- * The print file a framed print would get: the art centred on its own paper
- * with an even margin, on an A-series sheet in the art's orientation.
+ * The art centred on its own paper with an even margin, on a sheet of the
+ * given size. The framed print FILE (src/flow/printFile.ts) is this at the
+ * product's print size; the preview below is this on an A-series sheet.
+ */
+export function posterOnSheet(art: HTMLCanvasElement, paper: 'white' | 'cream', sheet: Size): HTMLCanvasElement {
+  const { c, ctx } = canvas(sheet.width, sheet.height);
+  ctx.fillStyle = paper === 'cream' ? `rgb(${CREAM.join(',')})` : '#FFFFFF';
+  ctx.fillRect(0, 0, sheet.width, sheet.height);
+  const at = placeArt(art, sheet);
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(art, at.x, at.y, at.width, at.height);
+  return c;
+}
+
+/**
+ * The print a framed print would get, for the preview: posterOnSheet on an
+ * A-series sheet in the art's orientation.
  */
 export function posterFor(art: HTMLCanvasElement, paper: 'white' | 'cream', long = 1400): HTMLCanvasElement {
-  const portrait = art.height >= art.width;
-  const W = portrait ? Math.round(long / Math.SQRT2) : long;
-  const H = portrait ? long : Math.round(long / Math.SQRT2);
-  const { c, ctx } = canvas(W, H);
-  ctx.fillStyle = paper === 'cream' ? `rgb(${CREAM.join(',')})` : '#FFFFFF';
-  ctx.fillRect(0, 0, W, H);
-  const margin = Math.round(Math.min(W, H) * 0.08);
-  const fit = contain(art.width, art.height, W - 2 * margin, H - 2 * margin);
-  ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(art, (W - fit.w) / 2, (H - fit.h) / 2, fit.w, fit.h);
-  return c;
+  return posterOnSheet(art, paper, aSeriesSheet(art, long));
 }
 
 export function framedMockup(art: HTMLCanvasElement, paper: 'white' | 'cream', size = 900): HTMLCanvasElement {
@@ -88,20 +95,18 @@ export function framedMockup(art: HTMLCanvasElement, paper: 'white' | 'cream', s
   return c;
 }
 
-/** Inks laid on cream, moved onto white: multiply onto paper is linear, so divide it back out. */
-function onWhite(art: HTMLCanvasElement, paper: 'white' | 'cream', maxLong: number): HTMLCanvasElement {
+/**
+ * Inks laid on cream, moved onto white: multiply onto paper is linear, so
+ * divide it back out. Used for the mug preview and the mug print file.
+ */
+export function onWhite(art: HTMLCanvasElement, paper: 'white' | 'cream', maxLong = Infinity): HTMLCanvasElement {
   const s = Math.min(1, maxLong / Math.max(art.width, art.height));
   const { c, ctx } = canvas(Math.round(art.width * s), Math.round(art.height * s));
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(art, 0, 0, c.width, c.height);
   if (paper === 'cream') {
     const img = ctx.getImageData(0, 0, c.width, c.height);
-    const d = img.data;
-    for (let i = 0; i < d.length; i += 4) {
-      d[i] = Math.min(255, (d[i] * 255) / CREAM[0]);
-      d[i + 1] = Math.min(255, (d[i + 1] * 255) / CREAM[1]);
-      d[i + 2] = Math.min(255, (d[i + 2] * 255) / CREAM[2]);
-    }
+    divideOutPaper(img.data, CREAM);
     ctx.putImageData(img, 0, 0);
   }
   return c;

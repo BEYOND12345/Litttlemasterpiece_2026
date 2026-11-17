@@ -23,16 +23,20 @@ interface CloudinaryUploadResponse {
   format: string;
 }
 
+/*
+ * Browser-safe Cloudinary only: a cloud name and an UNSIGNED upload preset,
+ * both public by design. Uploads used to be signed here with
+ * VITE_CLOUDINARY_API_SECRET, which put the account's API secret in the
+ * public bundle. That path is gone; an upload without a preset now fails
+ * with a clear message. If signed uploads are ever needed, sign them in a
+ * Supabase Edge Function.
+ */
 class CloudinaryService {
   private cloudName: string;
-  private apiKey: string;
-  private apiSecret: string;
   private uploadPreset?: string;
 
   constructor() {
     this.cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || '';
-    this.apiKey = import.meta.env.VITE_CLOUDINARY_API_KEY || '';
-    this.apiSecret = import.meta.env.VITE_CLOUDINARY_API_SECRET || '';
     this.uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
   }
 
@@ -40,8 +44,8 @@ class CloudinaryService {
     if (!this.cloudName) {
       return { valid: false, message: 'Cloudinary cloud name is not configured' };
     }
-    if (!this.apiKey && !this.uploadPreset) {
-      return { valid: false, message: 'Cloudinary API key or upload preset is required' };
+    if (!this.uploadPreset) {
+      return { valid: false, message: 'Cloudinary needs an unsigned upload preset (VITE_CLOUDINARY_UPLOAD_PRESET)' };
     }
     return { valid: true };
   }
@@ -57,20 +61,7 @@ class CloudinaryService {
     formData.append('folder', 'artworks');
     formData.append('public_id', `artwork_${artworkId}`);
 
-    if (this.uploadPreset) {
-      formData.append('upload_preset', this.uploadPreset);
-    } else {
-      const timestamp = Math.floor(Date.now() / 1000);
-      formData.append('timestamp', timestamp.toString());
-      formData.append('api_key', this.apiKey);
-
-      const signature = await this.generateSignature({
-        folder: 'artworks',
-        public_id: `artwork_${artworkId}`,
-        timestamp: timestamp.toString(),
-      });
-      formData.append('signature', signature);
-    }
+    formData.append('upload_preset', this.uploadPreset as string);
 
     const uploadUrl = `https://api.cloudinary.com/v1_1/${this.cloudName}/image/upload`;
 
@@ -196,23 +187,6 @@ class CloudinaryService {
     console.log('Final URL (length):', finalUrl.length);
 
     return finalUrl;
-  }
-
-  private async generateSignature(params: Record<string, string>): Promise<string> {
-    const sortedParams = Object.keys(params)
-      .sort()
-      .map(key => `${key}=${params[key]}`)
-      .join('&');
-
-    const stringToSign = `${sortedParams}${this.apiSecret}`;
-
-    const encoder = new TextEncoder();
-    const data = encoder.encode(stringToSign);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-
-    return hashHex;
   }
 
   getOptimizedUrl(publicId: string, width?: number, height?: number): string {

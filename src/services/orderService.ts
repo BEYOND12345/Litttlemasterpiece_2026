@@ -1,6 +1,5 @@
 import { supabase } from './supabaseClient';
 import { Order, OrderTimeline, PaymentHistory, CartItem, ShippingAddress } from '../types/types';
-import { createGelatoOrder } from './gelatoService';
 
 export const getUserOrders = async (): Promise<Order[]> => {
   const { data, error } = await supabase
@@ -128,142 +127,20 @@ export const getUserPaymentHistory = async (): Promise<PaymentHistory[]> => {
   }));
 };
 
-export const createOrder = async (
-  cartItems: CartItem[],
-  shippingAddress: ShippingAddress
-): Promise<string> => {
-  const { data: { session } } = await supabase.auth.getSession();
-  const user = session?.user;
-
-  if (!user) {
-    throw new Error('User must be authenticated to create an order');
-  }
-
-  const totalCents = cartItems.reduce((sum, item) => sum + (item.priceCents * item.quantity), 0);
-
-  const { data: addressData, error: addressError } = await supabase
-    .from('shipping_addresses')
-    .insert({
-      user_id: user.id,
-      name: shippingAddress.name,
-      address_line1: shippingAddress.addressLine1,
-      address_line2: shippingAddress.addressLine2,
-      city: shippingAddress.city,
-      state: shippingAddress.state,
-      postal_code: shippingAddress.postalCode,
-      country: shippingAddress.country,
-    })
-    .select()
-    .single();
-
-  if (addressError) {
-    console.error('Error creating shipping address:', addressError);
-    throw new Error('Failed to save shipping address');
-  }
-
-  const { data: orderData, error: orderError } = await supabase
-    .from('orders')
-    .insert({
-      user_id: user.id,
-      total_cents: totalCents,
-      status: 'pending',
-      payment_status: 'pending',
-      shipping_address_id: addressData.id,
-    })
-    .select()
-    .single();
-
-  if (orderError) {
-    console.error('Error creating order:', orderError);
-    throw new Error('Failed to create order');
-  }
-
-  const orderItemsData = cartItems.map(item => ({
-    order_id: orderData.id,
-    product_id: item.productVariant?.productId || '',
-    artwork_id: item.artworkId,
-    quantity: item.quantity,
-    price_cents: item.priceCents,
-  }));
-
-  const { error: itemsError } = await supabase
-    .from('order_items')
-    .insert(orderItemsData);
-
-  if (itemsError) {
-    console.error('Error creating order items:', itemsError);
-    throw new Error('Failed to save order items');
-  }
-
-  await supabase
-    .from('order_timeline')
-    .insert({
-      order_id: orderData.id,
-      status: 'pending',
-      notes: 'Order created',
-    });
-
-  try {
-    const nameParts = shippingAddress.name.split(' ');
-    const firstName = nameParts[0];
-    const lastName = nameParts.slice(1).join(' ') || firstName;
-
-    const gelatoOrderRequest = {
-      orderReferenceId: orderData.id,
-      orderType: 'draft' as const,
-      items: cartItems.map((item, index) => ({
-        itemReferenceId: `${orderData.id}-${index}`,
-        productUid: item.product?.gelatoProductUid || 'poster_fine-art-matte_a4_pt',
-        fileUrl: item.artwork?.processedUrl || '',
-        quantity: item.quantity,
-      })),
-      shippingAddress: {
-        firstName,
-        lastName,
-        addressLine1: shippingAddress.addressLine1,
-        addressLine2: shippingAddress.addressLine2,
-        city: shippingAddress.city,
-        postCode: shippingAddress.postalCode,
-        state: shippingAddress.state,
-        country: shippingAddress.country,
-        email: user.email || '',
-      },
-    };
-
-    const gelatoResponse = await createGelatoOrder(gelatoOrderRequest);
-
-    await supabase
-      .from('orders')
-      .update({ gelato_order_id: gelatoResponse.id })
-      .eq('id', orderData.id);
-
-    await supabase
-      .from('gelato_orders')
-      .insert({
-        order_id: orderData.id,
-        gelato_order_id: gelatoResponse.id,
-        gelato_order_reference: gelatoResponse.orderReferenceId,
-        status: gelatoResponse.status,
-        gelato_response: gelatoResponse,
-      });
-
-    await supabase
-      .from('order_timeline')
-      .insert({
-        order_id: orderData.id,
-        status: 'processing',
-        notes: 'Order submitted to Gelato for fulfillment',
-      });
-  } catch (gelatoError) {
-    console.error('Gelato API error:', gelatoError);
-    await supabase
-      .from('order_timeline')
-      .insert({
-        order_id: orderData.id,
-        status: 'pending',
-        notes: 'Gelato submission failed - will retry',
-      });
-  }
-
-  return orderData.id;
+/**
+ * SWITCHED OFF. This was the old studio's checkout: it wrote the order with
+ * a total the browser computed (and RLS lets a user write their own), then
+ * called Gelato straight from the browser with a VITE_ key, with no payment
+ * taken at all. Gelato's client is deleted; this now refuses before it
+ * writes anything, so the legacy cart and CheckoutPage cannot order even if
+ * they are reachable.
+ *
+ * Gifts are paid for in src/flow/checkout.ts: Stripe Checkout, priced on the
+ * server, and sent to Gelato only by the stripe-webhook function after a
+ * verified payment (docs/PAYMENTS.md).
+ */
+export const createOrder: (cartItems: CartItem[], shippingAddress: ShippingAddress) => Promise<string> = async () => {
+  throw new Error(
+    'Ordering from this page is switched off. To order a gift, use Create, choose your photo, and pay on the secure checkout.'
+  );
 };

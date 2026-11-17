@@ -9,8 +9,10 @@
  * about a second (src/pipeline), so the parent sees their child's drawing on
  * the product before they have decided anything.
  *
- * Ordering is handed to `onOrder`. Payment is not built yet; until it is,
- * App passes a handler that says so rather than one that orders anything.
+ * Ordering is handed to `onOrder`: App runs src/flow/checkout.ts, which makes
+ * the print file from `photo` and sends the parent to Stripe. `photo` itself
+ * is never uploaded (it can carry EXIF, GPS included); only the PNG drawn
+ * from it is.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Check, Loader2, Upload } from 'lucide-react';
