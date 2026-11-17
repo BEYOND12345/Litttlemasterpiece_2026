@@ -138,6 +138,13 @@ forward along the status table.
 The browser needs only `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. No
 `VITE_` variable may ever hold a secret (see `.env.example`).
 
+Ordering is OFF in any build unless `VITE_CHECKOUT_LIVE=true` is set at build
+time. Without it, pressing Order says "This is a preview: ordering isn't
+switched on yet", so a preview never fails with a network error that reads
+as broken, and never starts an order by accident. Set it only once steps 1
+to 5 above are done and the acceptance checks below have passed in test
+mode. It is not a secret (it is a switch), so a `VITE_` name is fine.
+
 ## Owner to-do
 
 **Stripe**
