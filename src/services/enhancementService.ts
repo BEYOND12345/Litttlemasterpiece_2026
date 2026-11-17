@@ -1,5 +1,4 @@
 import { supabase } from './supabaseClient';
-import { removeBackgroundWithAI } from './geminiService';
 
 // Helper to yield to browser to prevent freezing
 const yieldToBrowser = () => new Promise(resolve => setTimeout(resolve, 0));
@@ -40,52 +39,15 @@ export interface DigitizationResult {
   fallbackReason?: string;
 }
 
-const getReplicateApiKey = (): string | null => {
-  try {
-    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_REPLICATE_API_KEY) {
-      return import.meta.env.VITE_REPLICATE_API_KEY;
-    }
-  } catch (e) {
-    console.warn("Could not access Replicate API key");
-  }
-  return null;
-};
+/*
+ * No keys are read here. VITE_REPLICATE_API_KEY and VITE_REMOVEBG_API_KEY were
+ * read from the bundle, which publishes them to every visitor, and the bare
+ * env-object truthiness test published the whole env object with them. Every
+ * feature below now runs its local canvas fallback.
+ */
 
-const getRemoveBgApiKey = (): string | null => {
-  try {
-    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_REMOVEBG_API_KEY) {
-      return import.meta.env.VITE_REMOVEBG_API_KEY;
-    }
-  } catch (e) {
-    console.warn("Could not access Remove.bg API key");
-  }
-  return null;
-};
-
-export const removeBackground = async (imageInput: string): Promise<string> => {
-  try {
-    let base64Image = imageInput;
-
-    if (!base64Image.startsWith('data:')) {
-      const response = await fetch(base64Image);
-      const blob = await response.blob();
-      base64Image = await blobToBase64(blob);
-    }
-
-    const aiResult = await removeBackgroundWithAI(base64Image);
-
-    if (aiResult) {
-      console.log("✅ Background removed with Remove.bg API");
-      return aiResult;
-    }
-
-    console.warn("No Remove.bg API key found. Using local canvas-based background removal.");
-    return localBackgroundRemoval(imageInput);
-  } catch (error) {
-    console.error("Background removal failed, falling back to local method:", error);
-    return localBackgroundRemoval(imageInput);
-  }
-};
+/** Local background removal only: remove.bg needed a key in the browser bundle. */
+export const removeBackground = async (imageInput: string): Promise<string> => localBackgroundRemoval(imageInput);
 
 const localBackgroundRemoval = (imageInput: string): Promise<string> => {
   return new Promise(async (resolve, reject) => {
@@ -176,68 +138,10 @@ const localBackgroundRemoval = (imageInput: string): Promise<string> => {
   });
 };
 
-export const upscaleImage = async (base64Image: string, targetWidth: number = 4000): Promise<string> => {
-  const apiKey = getReplicateApiKey();
+/** Canvas upscaling only: the Replicate Real-ESRGAN path is gone with its browser-side key. */
+export const upscaleImage = async (base64Image: string, targetWidth: number = 4000): Promise<string> =>
+  canvasUpscale(base64Image, targetWidth);
 
-  if (!apiKey) {
-    console.warn("No Replicate API key found. Using canvas upscaling.");
-    return canvasUpscale(base64Image, targetWidth);
-  }
-
-  try {
-    const response = await fetch('https://api.replicate.com/v1/predictions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Token ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        version: 'nightmareai/real-esrgan:42fed1c4974146d4d2414e2be2c5277c7fcf05fcc3a73abf41610695738c1d7b',
-        input: {
-          image: base64Image,
-          scale: 4,
-          face_enhance: false,
-        },
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Replicate API error: ${response.status}`);
-    }
-
-    const prediction = await response.json();
-    const resultUrl = await pollForResult(prediction.id, apiKey);
-
-    const imageResponse = await fetch(resultUrl);
-    const imageBlob = await imageResponse.blob();
-    return blobToBase64(imageBlob);
-  } catch (error) {
-    console.error("Replicate upscaling failed, falling back to canvas:", error);
-    return canvasUpscale(base64Image, targetWidth);
-  }
-};
-
-const pollForResult = async (predictionId: string, apiKey: string, maxAttempts: number = 60): Promise<string> => {
-  for (let i = 0; i < maxAttempts; i++) {
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    const response = await fetch(`https://api.replicate.com/v1/predictions/${predictionId}`, {
-      headers: {
-        'Authorization': `Token ${apiKey}`,
-      },
-    });
-
-    const prediction = await response.json();
-
-    if (prediction.status === 'succeeded') {
-      return prediction.output;
-    } else if (prediction.status === 'failed') {
-      throw new Error('Prediction failed');
-    }
-  }
-
-  throw new Error('Prediction timeout');
-};
 
 const canvasUpscale = (base64Image: string, targetWidth: number): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -385,69 +289,10 @@ const applySharpenFilter = (imageData: ImageData): ImageData => {
   return output;
 };
 
-export const generateStyleVariant = async (
-  base64Image: string,
-  config: StyleVariantConfig
-): Promise<string> => {
-  const apiKey = getReplicateApiKey();
+/** Local filters only: the Replicate SDXL path is gone with its browser-side key. */
+export const generateStyleVariant = async (base64Image: string, config: StyleVariantConfig): Promise<string> =>
+  applyLocalStyleFilter(base64Image, config);
 
-  if (!apiKey) {
-    console.warn("No Replicate API key found. Using local filters.");
-    return applyLocalStyleFilter(base64Image, config);
-  }
-
-  try {
-    const prompt = getStylePrompt(config);
-
-    const response = await fetch('https://api.replicate.com/v1/predictions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Token ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        version: 'stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b',
-        input: {
-          image: base64Image,
-          prompt: prompt,
-          strength: 0.3,
-          guidance_scale: 7.5,
-          num_outputs: 1,
-          num_inference_steps: 25,
-        },
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Replicate API error: ${response.status}`);
-    }
-
-    const prediction = await response.json();
-    const resultUrl = await pollForResult(prediction.id, apiKey);
-
-    const imageResponse = await fetch(Array.isArray(resultUrl) ? resultUrl[0] : resultUrl);
-    const imageBlob = await imageResponse.blob();
-    return blobToBase64(imageBlob);
-  } catch (error) {
-    console.error("Style generation failed, using local filters:", error);
-    return applyLocalStyleFilter(base64Image, config);
-  }
-};
-
-const getStylePrompt = (config: StyleVariantConfig): string => {
-  switch (config.styleType) {
-    case 'enhanced':
-      return 'high quality print, enhanced details, vibrant colors, clean artwork, professional print quality';
-    case 'monochrome':
-      return `single color artwork, monochrome print, clean lines, ${config.monochromeColor || 'black'} tones only`;
-    case 'duotone':
-      return `two color screen print, duotone effect, ${config.duotoneDark} and ${config.duotoneLight} colors, bold graphic style`;
-    case 'primary':
-      return 'three primary colors only, bold simplified shapes, clean graphic design, limited color palette';
-    default:
-      return 'clean high quality artwork, remove artifacts, perfect for printing';
-  }
-};
 
 const applyLocalStyleFilter = (base64Image: string, config: StyleVariantConfig): Promise<string> => {
   return new Promise((resolve) => {
@@ -474,18 +319,6 @@ const applyLocalStyleFilter = (base64Image: string, config: StyleVariantConfig):
   });
 };
 
-const base64ToBlob = (base64: string): Blob => {
-  const base64Data = base64.split(',')[1];
-  const byteCharacters = atob(base64Data);
-  const byteNumbers = new Array(byteCharacters.length);
-
-  for (let i = 0; i < byteCharacters.length; i++) {
-    byteNumbers[i] = byteCharacters.charCodeAt(i);
-  }
-
-  const byteArray = new Uint8Array(byteNumbers);
-  return new Blob([byteArray], { type: 'image/png' });
-};
 
 const blobToBase64 = (blob: Blob): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -823,161 +656,18 @@ export const applyAggressiveCleanup = async (base64Image: string): Promise<strin
   });
 };
 
-export const digitizeArtwork = async (base64Image: string): Promise<DigitizationResult> => {
-  const apiKey = getReplicateApiKey();
+/**
+ * Digitisation was an SDXL pass on Replicate, called from the browser with a
+ * key baked into the bundle (and blocked by CORS anyway). Removed with that
+ * key; this is the result it already gave when no key was set.
+ */
+export const digitizeArtwork = async (base64Image: string): Promise<DigitizationResult> => ({
+  digitizedUrl: base64Image,
+  fidelityScore: 0,
+  success: false,
+  fallbackReason: 'Digitisation is not available',
+});
 
-  if (!apiKey) {
-    console.warn("No Replicate API key found. Cannot digitize without API access.");
-    return {
-      digitizedUrl: base64Image,
-      fidelityScore: 0,
-      success: false,
-      fallbackReason: 'API key not configured',
-    };
-  }
-
-  try {
-    const response = await fetch('https://api.replicate.com/v1/predictions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Token ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        version: 'stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b',
-        input: {
-          image: base64Image,
-          prompt: 'clean digital recreation of child drawing, preserve exact composition, crisp lines, even colors, professional print quality, hand-drawn style maintained, no new objects',
-          negative_prompt: 'no new objects, no changes to composition, no added shadows, no reinterpretation, no modifications, no additions',
-          strength: 0.2,
-          guidance_scale: 5.0,
-          num_outputs: 1,
-          num_inference_steps: 30,
-        },
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Replicate API error: ${response.status}`);
-    }
-
-    const prediction = await response.json();
-    const resultUrl = await pollForResult(prediction.id, apiKey);
-
-    const imageResponse = await fetch(Array.isArray(resultUrl) ? resultUrl[0] : resultUrl);
-    const imageBlob = await imageResponse.blob();
-    const digitizedUrl = await blobToBase64(imageBlob);
-
-    const fidelityScore = await calculateFidelityScore(base64Image, digitizedUrl);
-
-    if (fidelityScore < 0.85) {
-      return {
-        digitizedUrl: base64Image,
-        fidelityScore,
-        success: false,
-        fallbackReason: `Fidelity check failed (score: ${fidelityScore.toFixed(3)}). Original composition may have been altered.`,
-      };
-    }
-
-    return {
-      digitizedUrl,
-      fidelityScore,
-      success: true,
-    };
-  } catch (error) {
-    console.error("Digitization failed:", error);
-    return {
-      digitizedUrl: base64Image,
-      fidelityScore: 0,
-      success: false,
-      fallbackReason: error instanceof Error ? error.message : 'Unknown error during digitization',
-    };
-  }
-};
-
-const calculateFidelityScore = async (original: string, digitized: string): Promise<number> => {
-  return new Promise((resolve) => {
-    const img1 = new Image();
-    const img2 = new Image();
-    let loaded = 0;
-
-    const checkBothLoaded = () => {
-      loaded++;
-      if (loaded !== 2) return;
-
-      try {
-        const canvas1 = document.createElement('canvas');
-        const canvas2 = document.createElement('canvas');
-        const ctx1 = canvas1.getContext('2d');
-        const ctx2 = canvas2.getContext('2d');
-
-        if (!ctx1 || !ctx2) {
-          resolve(0);
-          return;
-        }
-
-        const size = Math.min(img1.width, img2.width, 512);
-        canvas1.width = canvas2.width = size;
-        canvas1.height = canvas2.height = size;
-
-        ctx1.drawImage(img1, 0, 0, size, size);
-        ctx2.drawImage(img2, 0, 0, size, size);
-
-        const data1 = ctx1.getImageData(0, 0, size, size).data;
-        const data2 = ctx2.getImageData(0, 0, size, size).data;
-
-        let totalDiff = 0;
-        let edgeCount1 = 0;
-        let edgeCount2 = 0;
-
-        for (let i = 0; i < data1.length; i += 4) {
-          const lum1 = 0.299 * data1[i] + 0.587 * data1[i + 1] + 0.114 * data1[i + 2];
-          const lum2 = 0.299 * data2[i] + 0.587 * data2[i + 1] + 0.114 * data2[i + 2];
-
-          totalDiff += Math.abs(lum1 - lum2);
-
-          if (i > size * 4 && i < data1.length - size * 4) {
-            const prevLum1 = 0.299 * data1[i - size * 4] + 0.587 * data1[i - size * 4 + 1] + 0.114 * data1[i - size * 4 + 2];
-            const nextLum1 = 0.299 * data1[i + size * 4] + 0.587 * data1[i + size * 4 + 1] + 0.114 * data1[i + size * 4 + 2];
-
-            if (Math.abs(lum1 - prevLum1) > 50 || Math.abs(lum1 - nextLum1) > 50) {
-              edgeCount1++;
-            }
-
-            const prevLum2 = 0.299 * data2[i - size * 4] + 0.587 * data2[i - size * 4 + 1] + 0.114 * data2[i - size * 4 + 2];
-            const nextLum2 = 0.299 * data2[i + size * 4] + 0.587 * data2[i + size * 4 + 1] + 0.114 * data2[i + size * 4 + 2];
-
-            if (Math.abs(lum2 - prevLum2) > 50 || Math.abs(lum2 - nextLum2) > 50) {
-              edgeCount2++;
-            }
-          }
-        }
-
-        const avgDiff = totalDiff / (data1.length / 4);
-        const structuralSimilarity = 1 - (avgDiff / 255);
-
-        const edgeSimilarity = 1 - Math.abs(edgeCount1 - edgeCount2) / Math.max(edgeCount1, edgeCount2, 1);
-
-        const fidelityScore = (structuralSimilarity * 0.7 + edgeSimilarity * 0.3);
-
-        resolve(Math.max(0, Math.min(1, fidelityScore)));
-      } catch (err) {
-        console.error("Fidelity calculation error:", err);
-        resolve(0);
-      }
-    };
-
-    img1.onload = checkBothLoaded;
-    img2.onload = checkBothLoaded;
-    img1.onerror = () => resolve(0);
-    img2.onerror = () => resolve(0);
-
-    img1.crossOrigin = "anonymous";
-    img2.crossOrigin = "anonymous";
-    img1.src = original;
-    img2.src = digitized;
-  });
-};
 
 export const performEnhancedCleanup = async (
   base64Image: string,
