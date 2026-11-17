@@ -112,6 +112,88 @@ export function onWhite(art: HTMLCanvasElement, paper: 'white' | 'cream', maxLon
   return c;
 }
 
+/**
+ * The flat print as the mug's screen columns see it: one column per screen
+ * pixel from x = ceil(left) across bodyW, for the columns `shows` keeps (a
+ * single run, since it keeps those near enough the middle). Column x is the
+ * exact average of the print between sourceX(x) and sourceX(x + 1), each
+ * source column weighted by how much of it falls in that range.
+ *
+ * By hand rather than with drawImage. Sampling one source column per screen
+ * column skipped the ones in between, so thin lines dropped out or merged
+ * (50 one-pixel lines drew as 38 or 39, the rest of uneven weight); and the
+ * canvas's own downscale is no average either: in Chromium a line at the edge
+ * of a 3-column range counts a third as much as one in its middle at 'high'
+ * quality, and not at all at 'low'.
+ */
+function wrapColumns(
+  flat: HTMLCanvasElement,
+  left: number,
+  bodyW: number,
+  shows: (x: number) => boolean,
+  sourceX: (px: number) => number,
+): { cols: HTMLCanvasElement; x0: number } | null {
+  const xs: number[] = [];
+  for (let x = Math.ceil(left); x < left + bodyW; x++) if (shows(x)) xs.push(x);
+  if (!xs.length) return null;
+  const W = flat.width;
+  const H = flat.height;
+  const n = xs.length;
+
+  // Each screen column's source columns, and how much of each it covers.
+  const taps = xs.map((x) => {
+    let s0 = Math.max(0, Math.min(W, sourceX(x)));
+    let s1 = Math.max(0, Math.min(W, sourceX(x + 1)));
+    if (s1 - s0 < 1e-6) {
+      // Pinned at an end of the print: the source column it sits on.
+      s0 = Math.min(W - 1, Math.floor(s0));
+      s1 = s0 + 1;
+    }
+    const idx: number[] = [];
+    const w: number[] = [];
+    for (let i = Math.floor(s0); i < Math.ceil(s1); i++) {
+      const cover = Math.min(i + 1, s1) - Math.max(i, s0);
+      if (cover > 0) {
+        idx.push(i);
+        w.push(cover);
+      }
+    }
+    return { idx, w, total: s1 - s0 };
+  });
+
+  const src = flat.getContext('2d')!.getImageData(0, 0, W, H).data;
+  const { c, ctx } = canvas(n, H);
+  const out = ctx.createImageData(n, H);
+  const o = out.data;
+  for (let y = 0; y < H; y++) {
+    const row = y * W * 4;
+    for (let j = 0; j < n; j++) {
+      const { idx, w, total } = taps[j];
+      let red = 0;
+      let green = 0;
+      let blue = 0;
+      let alpha = 0;
+      for (let k = 0; k < idx.length; k++) {
+        const p = row + idx[k] * 4;
+        const wa = w[k] * src[p + 3]; // weighted by alpha, so a clear pixel adds no colour
+        red += src[p] * wa;
+        green += src[p + 1] * wa;
+        blue += src[p + 2] * wa;
+        alpha += wa;
+      }
+      const q = (y * n + j) * 4;
+      if (alpha > 0) {
+        o[q] = red / alpha;
+        o[q + 1] = green / alpha;
+        o[q + 2] = blue / alpha;
+      }
+      o[q + 3] = alpha / total;
+    }
+  }
+  ctx.putImageData(out, 0, 0);
+  return { cols: c, x0: xs[0] };
+}
+
 export function mugMockup(art: HTMLCanvasElement, paper: 'white' | 'cream', size = 900): HTMLCanvasElement {
   const { c, ctx } = canvas(size, size);
   ctx.fillStyle = WALL;
@@ -164,9 +246,9 @@ export function mugMockup(art: HTMLCanvasElement, paper: 'white' | 'cream', size
   ctx.fill(body);
 
   // The art, wrapped round the cylinder: each column of the visible face
-  // samples the flat print at its arc length, so it compresses toward the
-  // edges the way a printed mug does. Multiplied, so the body's shading
-  // shows through the ink.
+  // shows the flat print between the arc lengths of its two edges, so it
+  // compresses toward the edges the way a printed mug does. Multiplied, so
+  // the body's shading shows through the ink.
   const flat = onWhite(art, paper, 900);
   const artH = bodyH * 0.72;
   const artW = (flat.width / flat.height) * artH;
@@ -175,12 +257,16 @@ export function mugMockup(art: HTMLCanvasElement, paper: 'white' | 'cream', size
   layer.ctx.fillStyle = '#FFFFFF';
   layer.ctx.fillRect(0, 0, size, size);
   const artTop = top + (bodyH - artH) / 2 + rim * 0.3;
-  for (let x = Math.ceil(left); x < left + bodyW; x++) {
+  const wrapped = wrapColumns(flat, left, bodyW, (x) => {
     const t = Math.max(-0.98, Math.min(0.98, (x + 0.5 - cx) / r));
-    const arc = r * Math.asin(t);
-    if (Math.abs(arc) > Math.min(arcMax, artW / 2)) continue;
-    const sx = ((arc + artW / 2) / artW) * flat.width;
-    layer.ctx.drawImage(flat, Math.max(0, Math.min(flat.width - 1, sx)), 0, 1, flat.height, x, artTop, 1, artH);
+    return Math.abs(r * Math.asin(t)) <= Math.min(arcMax, artW / 2);
+  }, (px) => {
+    const t = Math.max(-0.98, Math.min(0.98, (px - cx) / r));
+    return ((r * Math.asin(t) + artW / 2) / artW) * flat.width;
+  });
+  if (wrapped) {
+    layer.ctx.imageSmoothingQuality = 'high';
+    layer.ctx.drawImage(wrapped.cols, 0, 0, wrapped.cols.width, flat.height, wrapped.x0, artTop, wrapped.cols.width, artH);
   }
   ctx.save();
   ctx.clip(body);
