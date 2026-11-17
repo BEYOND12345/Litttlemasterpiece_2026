@@ -50,17 +50,37 @@ export const OrderConfirmed: React.FC<OrderConfirmedProps> = ({ sessionId, onDon
   return (
     <div className="bg-stone-50 min-h-screen">
       <div className="max-w-xl mx-auto px-4 py-16 text-center" data-testid="order-confirmed">
-        {!order && !error && (
-          <>
-            <Loader2 className="animate-spin mx-auto text-terracotta mb-4" size={36} />
-            <p className="font-serif text-2xl text-stone-900">Checking your order</p>
-          </>
-        )}
+        {/* One live region for "checking" and then the status itself, so a
+            screen reader hears it move from Confirming to Paid without the
+            parent having to go looking. It is there from the first render,
+            which is what lets the changes be announced. */}
+        <div role="status" data-testid="order-status">
+          {!order && !error && (
+            <>
+              <Loader2 className="animate-spin mx-auto text-terracotta mb-4" size={36} aria-hidden="true" />
+              <p className="font-serif text-2xl text-stone-900">Checking your order</p>
+            </>
+          )}
+
+          {order && copy && (
+            <>
+              <h1 className="font-serif text-4xl text-stone-900 mb-3" data-testid="order-status-title">{copy.title}</h1>
+              <p className="text-stone-600 mb-2">{copy.body}</p>
+              {productName && (
+                <p className="text-sm text-stone-500 mb-8">
+                  {productName}, {LOOK_NAMES[order.look] ?? order.look}
+                </p>
+              )}
+            </>
+          )}
+        </div>
 
         {error && !order && (
           <>
-            <p className="font-serif text-2xl text-stone-900 mb-2">{error}</p>
-            <p className="text-stone-600 mb-6">This page couldn't check your order. If you paid, your payment is not affected.</p>
+            <div role="alert">
+              <p className="font-serif text-2xl text-stone-900 mb-2">{error}</p>
+              <p className="text-stone-600 mb-6">This page couldn't check your order. If you paid, your payment is not affected.</p>
+            </div>
             <button
               onClick={() => setAttempt((a) => a + 1)}
               className="min-h-[48px] px-6 py-3 bg-terracotta text-white rounded-lg font-medium"
@@ -70,24 +90,13 @@ export const OrderConfirmed: React.FC<OrderConfirmedProps> = ({ sessionId, onDon
           </>
         )}
 
-        {order && copy && (
-          <>
-            <h1 className="font-serif text-4xl text-stone-900 mb-3" data-testid="order-status-title">{copy.title}</h1>
-            <p className="text-stone-600 mb-2">{copy.body}</p>
-            {productName && (
-              <p className="text-sm text-stone-500 mb-8">
-                {productName}, {LOOK_NAMES[order.look] ?? order.look}
-              </p>
-            )}
-            {!copy.settled && attempt >= STATUS_POLL_MAX && (
-              <button
-                onClick={() => setAttempt(0)}
-                className="min-h-[44px] px-5 py-2 border border-stone-300 rounded-lg text-stone-700 mb-6"
-              >
-                Check again
-              </button>
-            )}
-          </>
+        {order && copy && !copy.settled && attempt >= STATUS_POLL_MAX && (
+          <button
+            onClick={() => setAttempt(0)}
+            className="min-h-[44px] px-5 py-2 border border-stone-300 rounded-lg text-stone-700 mb-6"
+          >
+            Check again
+          </button>
         )}
 
         <div>
