@@ -208,29 +208,29 @@ const App: React.FC = () => {
     handleNavigate(AppView.DASHBOARD);
   };
 
+  // Set the first time the flow is shown; from then on it stays mounted.
+  const [flowOpened, setFlowOpened] = useState(false);
+  useEffect(() => {
+    if (currentView === AppView.STUDIO) setFlowOpened(true);
+  }, [currentView]);
+
   const renderContent = () => {
     switch (currentView) {
       case AppView.HOME:
         return <LandingPage onStart={() => handleStartCreating()} />;
 
       case AppView.STUDIO:
-        // The Christmas flow: photo, two looks, two products. The old studio
-        // (SimplifiedStudio) is still used for editing saved artworks below.
-        // Checkout progress sits OVER the flow, not instead of it, so Back
-        // returns to the parent's choices rather than to an empty flow.
-        return (
-          <>
-            <MakeFlow initialFile={initialFile || undefined} onOrder={runCheckout} />
-            {checkout && (
-              <CheckoutProgress
-                step={checkout.step}
-                error={checkout.error}
-                onRetry={() => runCheckout(checkout.selection)}
-                onBack={() => setCheckout(null)}
-              />
-            )}
-          </>
-        );
+        // The flow itself is rendered outside this switch (see below) so it
+        // survives a visit to another page. Checkout progress sits OVER it,
+        // so Back returns to the parent's choices rather than an empty flow.
+        return checkout ? (
+          <CheckoutProgress
+            step={checkout.step}
+            error={checkout.error}
+            onRetry={() => runCheckout(checkout.selection)}
+            onBack={() => setCheckout(null)}
+          />
+        ) : null;
 
       case AppView.ENHANCEMENT:
         // Nothing to show (e.g. Back to an entry from before a reload): this
@@ -333,6 +333,15 @@ const App: React.FC = () => {
                   OK
                 </button>
               </div>
+            </div>
+          )}
+          {/* The Christmas flow stays mounted once opened, and is only hidden
+              on other pages: a parent who checks Shipping & Returns before
+              ordering comes back to their photo, look and gift instead of
+              an empty flow. */}
+          {flowOpened && (
+            <div hidden={currentView !== AppView.STUDIO}>
+              <MakeFlow initialFile={initialFile || undefined} onOrder={runCheckout} />
             </div>
           )}
           {renderContent()}
