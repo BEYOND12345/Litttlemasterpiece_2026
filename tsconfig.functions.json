@@ -1,0 +1,28 @@
+{
+  // Type-checks supabase/functions WITHOUT Deno: the `npm:` specifiers the
+  // functions import are mapped onto the same pinned versions in
+  // node_modules (supabase-js by path; stripe, whose typings are an ambient
+  // `declare module 'stripe'`, by a re-export in scripts/deno-shim.d.ts),
+  // and the shim declares the two Deno globals they use. Real Stripe and
+  // Supabase types, then; Deno's own checker has not been run on these files.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "types": ["node", "stripe"],
+    "baseUrl": ".",
+    "paths": {
+      "npm:@supabase/supabase-js@2.57.4": ["node_modules/@supabase/supabase-js"]
+    }
+  },
+  "include": ["supabase/functions/**/*.ts", "scripts/deno-shim.d.ts"]
+}
