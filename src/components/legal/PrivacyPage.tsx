@@ -1,8 +1,8 @@
 // DRAFT: to be reviewed (ideally by a lawyer) before launch. This is not legal
-// advice. Every [TO CONFIRM] marker must be filled in or removed first.
+// advice. Every <Placeholder> must be confirmed or replaced first (docs/LAUNCH_CHECKLIST.md).
 import React from 'react';
 import { BUSINESS } from './business';
-import { Bullets, ContactEmail, LegalPage, Section, ToConfirm } from './LegalKit';
+import { Bullets, ContactEmail, LegalPage, Section, Placeholder } from './LegalKit';
 
 export const PrivacyPage: React.FC = () => (
   <LegalPage
@@ -57,7 +57,10 @@ export const PrivacyPage: React.FC = () => (
           'Stripe: to take your payment.',
           <>
             The companies that host this website and store order details and print files for us:{' '}
-            <ToConfirm>name the hosting and storage providers</ToConfirm>.
+            <Placeholder confirm="name the hosting and storage providers">
+              Supabase (order details and print files) and our website host
+            </Placeholder>
+            .
           </>,
         ]}
       />
@@ -71,7 +74,10 @@ export const PrivacyPage: React.FC = () => (
       <p>
         Stripe and Gelato work internationally, and Gelato may print your order in another country, close to
         where it is being delivered. So your information may be handled outside Australia, including in{' '}
-        <ToConfirm>the countries where the print files and order details are stored and processed</ToConfirm>.
+        <Placeholder confirm="the countries where print files and order details are stored and processed">
+          Australia, the United States and the European Union
+        </Placeholder>
+        .
       </p>
     </Section>
 
@@ -79,13 +85,14 @@ export const PrivacyPage: React.FC = () => (
       <Bullets
         items={[
           <>
-            Print files: we delete them 90 days after your order is delivered, which leaves time to sort out a
-            reprint if something goes wrong.{' '}
-            <ToConfirm>the 90-day period, and that this deletion is actually set up</ToConfirm>
+            <Placeholder confirm="the 90-day period, and that the deletion job is actually set up (it is not yet)">
+              Print files: we delete them 90 days after your order is delivered, which leaves time to sort out a
+              reprint if something goes wrong.
+            </Placeholder>
           </>,
           <>
             Order records (what you bought, what you paid, where it went): we keep these for{' '}
-            <ToConfirm>how long, for example the 5 years Australian tax records are kept</ToConfirm>.
+            <Placeholder confirm="how long order records are kept">5 years, as Australian tax records require</Placeholder>.
           </>,
         ]}
       />

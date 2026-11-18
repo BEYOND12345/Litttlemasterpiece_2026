@@ -2,7 +2,7 @@ import React from 'react';
 import { AppView, User } from '../types/types';
 import { APP_NAME } from '../constants/constants';
 import { BUSINESS } from './legal/business';
-import { ToConfirm } from './legal/LegalKit';
+import { Placeholder } from './legal/LegalKit';
 
 interface LayoutProps {
   currentView: AppView;
@@ -83,11 +83,11 @@ export const Layout: React.FC<LayoutProps> = ({ currentView, onNavigate, childre
 
           <div className="border-t border-stone-800 pt-8 text-xs leading-relaxed space-y-2">
             <p>
-              {BUSINESS.tradingName} is run by {BUSINESS.legalName}, ABN {BUSINESS.abn}, {BUSINESS.location}.{' '}
-              <ToConfirm>
-                this ABN was taken from the owner's other business's website. Check on the ABN Lookup that it is{' '}
-                {BUSINESS.legalName}'s
-              </ToConfirm>
+              {BUSINESS.tradingName} is run by {BUSINESS.legalName}, ABN{' '}
+              <Placeholder confirm="this ABN was taken from the owner's other business's website: check on the ABN Lookup that it is MotionStory Pty Ltd's">
+                {BUSINESS.abn}
+              </Placeholder>
+              , {BUSINESS.location}.
             </p>
             <p>Printed by Gelato. Payments by Stripe. Prices in AUD, including GST.</p>
             <p>&copy; {new Date().getFullYear()} {BUSINESS.legalName}. All rights reserved.</p>

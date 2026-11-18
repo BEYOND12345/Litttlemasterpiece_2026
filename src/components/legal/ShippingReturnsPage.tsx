@@ -1,8 +1,8 @@
 // DRAFT: to be reviewed (ideally by a lawyer) before launch. This is not legal
-// advice. Every [TO CONFIRM] marker must be filled in or removed first.
+// advice. Every <Placeholder> must be confirmed or replaced first (docs/LAUNCH_CHECKLIST.md).
 import React from 'react';
 import { AppView } from '../../types/types';
-import { Bullets, ContactEmail, LegalPage, LegalPageNav, PageLink, Section, ToConfirm } from './LegalKit';
+import { Bullets, ContactEmail, LegalPage, LegalPageNav, PageLink, Section, Placeholder } from './LegalKit';
 
 export const ShippingReturnsPage: React.FC<LegalPageNav> = ({ onNavigate }) => (
   <LegalPage
@@ -20,16 +20,30 @@ export const ShippingReturnsPage: React.FC<LegalPageNav> = ({ onNavigate }) => (
       <Bullets
         items={[
           <>
-            Delivery times: <ToConfirm>delivery times, by region</ToConfirm>
+            Delivery times:{' '}
+            <Placeholder confirm="delivery times by region, from Gelato">
+              most orders are printed within a few business days and arrive within about 1 to 2 weeks, depending
+              on where you are.
+            </Placeholder>
           </>,
           <>
-            Christmas: <ToConfirm>last order dates for delivery before Christmas, by region</ToConfirm>
+            Christmas:{' '}
+            <Placeholder confirm="last order dates for Christmas delivery, by region, from Gelato">
+              we'll post last order dates for Christmas delivery here. Order early to be safe.
+            </Placeholder>
           </>,
           <>
-            Shipping cost: <ToConfirm>whether shipping is included in the price or charged at checkout, and how much</ToConfirm>
+            Shipping cost:{' '}
+            <Placeholder confirm="whether shipping is included in the price or charged at checkout, and how much">
+              standard shipping is included in the price.
+            </Placeholder>
           </>,
           <>
-            Outside Australia: <ToConfirm>whether customers outside Australia may pay import duties or local taxes</ToConfirm>
+            Outside Australia:{' '}
+            <Placeholder confirm="whether customers outside Australia may pay import duties or local taxes">
+              orders are printed close to where they are going wherever possible. If import duties or local taxes
+              apply, they are paid on delivery.
+            </Placeholder>
           </>,
           'Prices are in Australian dollars (AUD) and include GST. If your card is in another currency, your card provider converts the amount.',
         ]}

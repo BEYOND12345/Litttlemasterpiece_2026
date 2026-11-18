@@ -2,6 +2,7 @@
 // be reviewed before launch, and are not legal advice.
 import React from 'react';
 import { AppView } from '../../types/types';
+import { BUSINESS } from './business';
 
 export interface LegalPageNav {
   onNavigate?: (view: AppView) => void;
@@ -22,17 +23,21 @@ export const PageLink: React.FC<LegalPageNav & { to: AppView; children: React.Re
   );
 
 /**
- * A fact the owner has not confirmed yet. Rendered loudly on purpose: it must
- * be impossible to ship a page with one of these still in it and not notice.
+ * A placeholder fact standing in until the owner confirms it. It reads as
+ * normal text so the preview is clean; `confirm` says what must be checked.
+ * Every one is in docs/LAUNCH_CHECKLIST.md. Do not launch with any left:
+ * `grep -rn "<Placeholder" src` must find none.
  */
-export const ToConfirm: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <mark data-to-confirm="" className="bg-amber-200 text-stone-900 font-medium px-1 rounded-sm">
-    [TO CONFIRM: {children}]
-  </mark>
+export const Placeholder: React.FC<{ confirm: string; children: React.ReactNode }> = ({ confirm, children }) => (
+  <span data-placeholder={confirm}>{children}</span>
 );
 
 /** The one contact address, used on every legal page. */
-export const ContactEmail: React.FC = () => <ToConfirm>contact email address</ToConfirm>;
+export const ContactEmail: React.FC = () => (
+  <Placeholder confirm="contact email address">
+    <a className="underline" href={`mailto:${BUSINESS.contactEmail}`}>{BUSINESS.contactEmail}</a>
+  </Placeholder>
+);
 
 interface LegalPageProps {
   title: string;
@@ -48,7 +53,7 @@ export const LegalPage: React.FC<LegalPageProps> = ({ title, intro, dated = true
       <h1 className="font-serif text-4xl md:text-5xl text-stone-900 leading-tight mb-4">{title}</h1>
       {dated && (
         <p className="text-sm text-stone-500 mb-8">
-          Last updated: <ToConfirm>the date these pages take effect</ToConfirm>
+          Last updated: <Placeholder confirm="the date these pages take effect">{BUSINESS.effectiveDate}</Placeholder>
         </p>
       )}
       {intro && <p className="text-lg text-stone-600 font-light leading-relaxed mb-12">{intro}</p>}

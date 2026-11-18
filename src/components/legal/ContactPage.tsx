@@ -1,5 +1,5 @@
 // DRAFT: to be reviewed before launch. This is not legal advice. Every
-// [TO CONFIRM] marker must be filled in or removed first.
+// <Placeholder> must be confirmed or replaced first (docs/LAUNCH_CHECKLIST.md).
 import React from 'react';
 import { AppView } from '../../types/types';
 import { BUSINESS } from './business';

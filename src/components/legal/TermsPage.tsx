@@ -1,9 +1,9 @@
 // DRAFT: to be reviewed (ideally by a lawyer) before launch. This is not legal
-// advice. Every [TO CONFIRM] marker must be filled in or removed first.
+// advice. Every <Placeholder> must be confirmed or replaced first (docs/LAUNCH_CHECKLIST.md).
 import React from 'react';
 import { AppView } from '../../types/types';
 import { BUSINESS } from './business';
-import { Bullets, ContactEmail, LegalPage, LegalPageNav, PageLink, Section, ToConfirm } from './LegalKit';
+import { Bullets, ContactEmail, LegalPage, LegalPageNav, PageLink, Section, Placeholder } from './LegalKit';
 
 export const TermsPage: React.FC<LegalPageNav> = ({ onNavigate }) => (
   <LegalPage
@@ -56,7 +56,10 @@ export const TermsPage: React.FC<LegalPageNav> = ({ onNavigate }) => (
           'If your card is in another currency, your card provider converts the amount and may charge a fee.',
           'Payment is taken by Stripe when you order. You do not need an account.',
           <>
-            Shipping: <ToConfirm>whether shipping is included in the price or charged at checkout, and how much</ToConfirm>
+            Shipping:{' '}
+            <Placeholder confirm="whether shipping is included in the price or charged at checkout, and how much">
+              standard shipping is included in the price.
+            </Placeholder>
           </>,
         ]}
       />
@@ -89,8 +92,11 @@ export const TermsPage: React.FC<LegalPageNav> = ({ onNavigate }) => (
 
     <Section title="The law that applies">
       <p>
-        These terms are governed by the laws of New South Wales, Australia.{' '}
-        <ToConfirm>the governing state. New South Wales is suggested because the business is in Byron Bay</ToConfirm>
+        These terms are governed by the laws of{' '}
+        <Placeholder confirm="the governing state (New South Wales suggested, the business is in Byron Bay)">
+          New South Wales
+        </Placeholder>
+        , Australia.
       </p>
     </Section>
 
